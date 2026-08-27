@@ -779,12 +779,17 @@ const isVisibleProduct = (product) => {
   return status === 'active';
 };
 
+const isActiveImage = (image) => {
+  const status = pickText(image?.status).toLowerCase();
+  return !status || status === 'active';
+};
+
 const getProductDisplayName = (product) =>
   pickText(product?.product_name, product?.alias_name, `Product ${pickText(product?.id)}`);
 
 const resolveProductImages = (product) =>
   (Array.isArray(product?.images) ? product.images : [])
-    .filter((image) => pickText(image?.image_url))
+    .filter((image) => isActiveImage(image) && pickText(image?.image_url))
     .sort((a, b) => normalizeOrder(a?.sort_order) - normalizeOrder(b?.sort_order));
 
 const resolveProductPrice = (product) => {

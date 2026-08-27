@@ -48,12 +48,20 @@ const normalizeText = (value) => {
   return ['null', 'undefined', 'nan'].includes(lowered) ? '' : text;
 };
 
-const resolveImageUrl = (item) => {
-  const selectedImage = normalizeText(item?.selected_image);
-  if (selectedImage) return selectedImage;
+const isActiveImage = (image) => {
+  const status = normalizeText(image?.status).toLowerCase();
+  return !status || status === 'active';
+};
 
-  const images = Array.isArray(item?.images) ? [...item.images] : [];
+const resolveImageUrl = (item) => {
+  const images = (Array.isArray(item?.images) ? [...item.images] : [])
+    .filter((image) => isActiveImage(image) && normalizeText(image?.image_url));
   images.sort((a, b) => (Number(a?.sort_order) || 0) - (Number(b?.sort_order) || 0));
+
+  const selectedImage = normalizeText(item?.selected_image);
+  const selectedImageIsActive = images.some((image) => normalizeText(image?.image_url) === selectedImage);
+  if (selectedImage && (images.length === 0 || selectedImageIsActive)) return selectedImage;
+
   return normalizeText(images[0]?.image_url);
 };
 

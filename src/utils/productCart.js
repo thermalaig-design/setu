@@ -46,6 +46,11 @@ const normalizeText = (value) => {
   return ['null', 'undefined', 'nan'].includes(lowered) ? '' : text;
 };
 
+const isActiveImage = (image) => {
+  const status = normalizeText(image?.status).toLowerCase();
+  return !status || status === 'active';
+};
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const isUuid = (value) => UUID_RE.test(String(value || '').trim());
@@ -567,7 +572,7 @@ export const toCartItem = (product, context = {}) => {
     alias_name: normalizeText(product?.alias_name),
     purchase_id: normalizeText(context.cartPurchaseId || context.cart_purchase_id),
     product_price_id: productPriceId,
-    images: Array.isArray(product?.images) ? product.images : [],
+    images: Array.isArray(product?.images) ? product.images.filter(isActiveImage) : [],
     selected_image: normalizeText(context.selectedImage || product?.selected_image),
     selected_attributes: normalizeAttributes(context.selectedAttributes || product?.selected_attributes || {}),
     attribute_values: normalizeAttributeRows(context.attributeValues || product?.attribute_values || []),
@@ -1080,8 +1085,8 @@ const buildRemoteCartPrice = (row = {}, priceRow = null, quantity = 1) => {
 };
 
 const normalizeCatalogImages = (product = {}, row = {}) => {
-  if (Array.isArray(product?.images)) return product.images;
-  if (Array.isArray(row?.images)) return row.images;
+  if (Array.isArray(product?.images)) return product.images.filter(isActiveImage);
+  if (Array.isArray(row?.images)) return row.images.filter(isActiveImage);
 
   const imageUrl = normalizeText(
     product?.image_url

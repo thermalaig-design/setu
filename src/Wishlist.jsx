@@ -41,6 +41,11 @@ const normalizeText = (value) => {
   return ['null', 'undefined', 'nan'].includes(lowered) ? '' : text;
 };
 
+const isActiveImage = (image) => {
+  const status = normalizeText(image?.status).toLowerCase();
+  return !status || status === 'active';
+};
+
 const toTitleCase = (value) => {
   const text = normalizeText(value).toLowerCase();
   if (!text) return '';
@@ -133,9 +138,15 @@ const isVariantSelectionComplete = (options = {}, selected = {}) => (
 );
 
 const resolveImageUrl = (item) => {
-  const images = Array.isArray(item?.images) ? [...item.images] : [];
+  const images = (Array.isArray(item?.images) ? [...item.images] : [])
+    .filter((image) => isActiveImage(image) && normalizeText(image?.image_url));
   images.sort((a, b) => (Number(a?.sort_order) || 0) - (Number(b?.sort_order) || 0));
-  return normalizeText(item?.selected_image || item?.image_url || item?.imageUrl || images[0]?.image_url);
+
+  const selectedImage = normalizeText(item?.selected_image || item?.image_url || item?.imageUrl);
+  const selectedImageIsActive = images.some((image) => normalizeText(image?.image_url) === selectedImage);
+  if (selectedImage && (images.length === 0 || selectedImageIsActive)) return selectedImage;
+
+  return normalizeText(images[0]?.image_url);
 };
 
 const resolvePrice = (item) => {

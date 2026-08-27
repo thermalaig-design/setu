@@ -249,9 +249,14 @@ const isVisibleProduct = (product) => {
   return status === 'active';
 };
 
+const isActiveImage = (image) => {
+  const status = pickText(image?.status).toLowerCase();
+  return !status || status === 'active';
+};
+
 const resolveProductImages = (product) =>
   (Array.isArray(product?.images) ? product.images : [])
-    .filter((image) => pickText(image?.image_url))
+    .filter((image) => isActiveImage(image) && pickText(image?.image_url))
     .sort((a, b) => normalizeOrder(a?.sort_order) - normalizeOrder(b?.sort_order));
 
 const resolveProductPrice = (product) => {
@@ -1900,8 +1905,8 @@ const ProductList = ({ categoryId, onBack, onOpenProduct }) => {
         .ws-plp-name { font-size: 15px; color: ${navbarTextColor}; line-height: 1.3; }
         .ws-plp-code { margin-top: 2px; font-size: 11px; color: ${T.inkSoft}; line-height: 1.25; }
         .ws-price-row { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
-        .ws-sheet-overlay { position: fixed; inset: 0; background: rgba(28,27,25,0.4); z-index: 20; display: flex; align-items: flex-end; max-width: 430px; margin: 0 auto; }
-        .ws-sheet { background: ${T.bg}; width: 100%; border-radius: 18px 18px 0 0; max-height: 72vh; display: flex; flex-direction: column; }
+        .ws-sheet-overlay { position: fixed; inset: 0; background: rgba(28,27,25,0.4); z-index: 20; display: flex; align-items: flex-end;  margin: 0 auto; }
+        .ws-sheet { background: ${T.bg}; width: 100%; max-width: 430px; margin: 0 auto; border-radius: 18px 18px 0 0; max-height: 72vh; display: flex; flex-direction: column; }
         .ws-sheet-handle { width: 36px; height: 4px; background: ${T.line}; border-radius: 999px; margin: 10px auto 4px; }
         .ws-sheet-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 18px 14px; border-bottom: 1px solid ${T.line}; }
         .ws-sheet-title { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 600; }
