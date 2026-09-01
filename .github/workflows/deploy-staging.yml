@@ -17,6 +17,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
+
           script: |
             set -e
 
@@ -26,30 +27,48 @@ jobs:
             git branch --show-current
 
             echo "Fetching latest live branch..."
-            GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed25519" git fetch origin live
+            GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed25519" git fetch origin
 
+            echo "Switching to live..."
             git checkout live
+
+            echo "Resetting server to origin/live..."
             git reset --hard origin/live
+
+            echo "Verifying deployed commit..."
+            LOCAL_COMMIT=$(git rev-parse HEAD)
+            REMOTE_COMMIT=$(git rev-parse origin/live)
+
+            echo "Local:  $LOCAL_COMMIT"
+            echo "Remote: $REMOTE_COMMIT"
+
+            if [ "$LOCAL_COMMIT" != "$REMOTE_COMMIT" ]; then
+              echo "ERROR: Live server is not on latest origin/live commit"
+              exit 1
+            fi
 
             echo "Latest deployed commit:"
             git log -1 --oneline
 
             echo "Installing frontend dependencies..."
-            npm install
+            npm ci
 
             echo "Building frontend..."
             npm run build
 
             echo "Installing backend dependencies..."
             cd backend
-            npm install
+            npm ci
 
             echo "Restarting backend..."
-            pm2 restart app-live || pm2 start npm --name app-live -- start
+            pm2 restart app-live --update-env || pm2 start npm --name app-live -- start
+
             pm2 save
 
-            echo "Reloading nginx..."
+            echo "Checking nginx..."
             nginx -t
+
+            echo "Reloading nginx..."
             systemctl reload nginx
 
             echo "LIVE DEPLOYMENT COMPLETE"
