@@ -2674,18 +2674,20 @@ const Home = ({ onNavigate, onLogout }) => {
           </button>
 
           {/* Trust logo + name */}
-          <div className="flex items-center gap-2.5 flex-1 justify-center">
+          <div className="flex items-center flex-1 justify-center mx-2 min-w-0">
             {(() => {
               const trustName = activeTrust?.name || trustInfo?.name || defaultTrust?.name || '';
-              const isLongName = trustName.length > 20;
+              const isLongName = trustName.length > 35;
               
               return isLongName ? (
                 <div className="overflow-hidden w-full flex items-center">
                   <h1
-                    className="font-extrabold text-[15px] whitespace-nowrap"
-                    style={{ color: navbarTextColor, animation: 'marquee 15s linear infinite', maxWidth: '9rem' }}
+                    className="trust-heading-marquee font-extrabold text-[15px] whitespace-nowrap min-w-max"
+                    style={{ color: navbarTextColor }}
+                    aria-label={trustName}
                   >
-                    {trustName}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <span>{trustName}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+                    <span aria-hidden="true">{trustName}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
                   </h1>
                 </div>
               ) : (
@@ -3425,6 +3427,17 @@ const Home = ({ onNavigate, onLogout }) => {
         @keyframes marquee-scroll {
           0%   { transform: translateX(0); }
           100% { transform: translateX(-50%); }
+        }
+
+        .trust-heading-marquee {
+          display: inline-block;
+          animation: trust-heading-scroll 30s linear infinite;
+          will-change: transform;
+        }
+
+        @keyframes trust-heading-scroll {
+          0%, 15% { transform: translateX(0); }
+          85%, 100% { transform: translateX(-50%); }
         }
 
         @keyframes themeFadeIn {
