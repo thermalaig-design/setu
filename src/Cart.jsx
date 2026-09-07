@@ -1096,11 +1096,23 @@ function Cart() {
                       <div className="cart-info">
                         <p className="cart-name">{titleCaseText(item.product_name)}</p>
                         {price ? (
-                          <div className="cart-price">
-                            <span className="cart-price-main">{formatCurrency(price.value)}</span>
-                            {price.discountPct > 0 ? <span className="cart-mrp">{formatCurrency(price.mrp)}</span> : null}
-                            {price.discountPct > 0 ? <span className="cart-discount">{titleCaseText(`${price.discountPct}% off`)}</span> : null}
-                          </div>
+                          <>
+                            <div className="cart-price">
+                              <span className="cart-price-main">{formatCurrency(price.value)}</span>
+                              {price.discountPct > 0 ? <span className="cart-mrp">{formatCurrency(price.mrp)}</span> : null}
+                              {price.discountPct > 0 ? <span className="cart-discount">{titleCaseText(`${price.discountPct}% off`)}</span> : null}
+                            </div>
+                            {(pricing.taxAmount > 0 || pricing.transportAmount > 0) ? (
+                              <div className="cart-price-breakdown">
+                                {pricing.taxAmount > 0 ? (
+                                  <span>{titleCaseText('Taxes')}: {formatCurrency(pricing.taxAmount)}</span>
+                                ) : null}
+                                {pricing.transportAmount > 0 ? (
+                                  <span>{titleCaseText('Delivery')}: {formatCurrency(pricing.transportAmount)}</span>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </>
                         ) : null}
                         {attributeEntries.length > 0 ? (
                           <div className="cart-attributes">
@@ -1549,6 +1561,16 @@ function Cart() {
           color: ${T.clay};
           font-size: 11px;
           font-weight: 800;
+        }
+        .cart-price-breakdown {
+          margin-top: 5px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 5px 9px;
+          font-size: 11px;
+          font-weight: 650;
+          line-height: 1.35;
+          color: ${T.muted};
         }
         .cart-attributes {
           margin-top: 8px;

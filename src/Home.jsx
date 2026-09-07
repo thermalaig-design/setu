@@ -144,7 +144,7 @@ const readCachedTrustList = () => {
   }
 };
 
-const FEATURE_FLAGS_CACHE_PREFIX = 'feature_flags_cache_v3:';
+const FEATURE_FLAGS_CACHE_PREFIX = 'feature_flags_cache_v4:';
 const readInitialFeatureFlagsCache = (trustId) => {
   try {
     const normalizedTrustId = String(trustId || '').trim();
@@ -2170,6 +2170,8 @@ const Home = ({ onNavigate, onLogout }) => {
   };
 
   const ff = (key) => isFeatureVisible(featureFlags, key);
+  const normalizeDisplayInApp = (value) => String(value || 'home').trim().toLowerCase();
+  const isFeaturePlacedInHome = (key) => normalizeDisplayInApp(flagsData?.[key]?.display_in_app) === 'home';
   const showMemberBannerFeature = ff('feature_member_banner');
   const normalizeQuickRoute = (route) => {
     const raw = String(route || '').trim().toLowerCase();
@@ -2232,6 +2234,7 @@ const Home = ({ onNavigate, onLogout }) => {
     .filter(([key, data]) => (
       Boolean(key)
       && data?.is_enabled
+      && normalizeDisplayInApp(data?.display_in_app) === 'home'
       && key !== 'feature_add_community'
       && key !== 'feature_nomination_details'
       && key !== 'feature_nomination'
@@ -2254,7 +2257,7 @@ const Home = ({ onNavigate, onLogout }) => {
 
   // Fallback tiles only mirror existing enabled rows. Deleted rows are not resurrected here.
   const fallbackQuickActions = [
-    ff('feature_directory') ? {
+    ff('feature_directory') && isFeaturePlacedInHome('feature_directory') ? {
       id: 'feature_directory_fallback',
       route: 'directory',
       displayName: 'Directory',
@@ -2262,7 +2265,7 @@ const Home = ({ onNavigate, onLogout }) => {
       icon_url: '/icons/quick-access/directory.svg',
       quick_order: 50,
     } : null,
-    ff('feature_opd') ? {
+    ff('feature_opd') && isFeaturePlacedInHome('feature_opd') ? {
       id: 'feature_opd_fallback',
       route: 'appointment',
       displayName: 'OPD',
@@ -2270,7 +2273,7 @@ const Home = ({ onNavigate, onLogout }) => {
       icon_url: '/icons/quick-access/opd.svg',
       quick_order: 60,
     } : null,
-    ff('feature_referral') ? {
+    ff('feature_referral') && isFeaturePlacedInHome('feature_referral') ? {
       id: 'feature_referral_fallback',
       route: 'reference',
       displayName: 'Referral',
@@ -2278,7 +2281,7 @@ const Home = ({ onNavigate, onLogout }) => {
       icon_url: '/icons/quick-access/referral.svg',
       quick_order: 70,
     } : null,
-    ff('feature_reports') ? {
+    ff('feature_reports') && isFeaturePlacedInHome('feature_reports') ? {
       id: 'feature_reports_fallback',
       route: 'reports',
       displayName: 'Reports',
@@ -2286,7 +2289,7 @@ const Home = ({ onNavigate, onLogout }) => {
       icon_url: '/icons/quick-access/reports.svg',
       quick_order: 75,
     } : null,
-    ff('feature_noticeboard') ? {
+    ff('feature_noticeboard') && isFeaturePlacedInHome('feature_noticeboard') ? {
       id: 'feature_noticeboard_fallback',
       route: 'notices',
       displayName: 'Noticeboard',
@@ -2294,7 +2297,7 @@ const Home = ({ onNavigate, onLogout }) => {
       icon_url: '/icons/quick-access/noticeboard.svg',
       quick_order: 80,
     } : null,
-    ff('feature_facilities') ? {
+    ff('feature_facilities') && isFeaturePlacedInHome('feature_facilities') ? {
       id: 'feature_facilities_fallback',
       route: 'facilities',
       displayName: 'Facilities',
@@ -2302,7 +2305,7 @@ const Home = ({ onNavigate, onLogout }) => {
       icon_url: '/icons/quick-access/facilities.svg',
       quick_order: 85,
     } : null,
-    ff('feature_events') ? {
+    ff('feature_events') && isFeaturePlacedInHome('feature_events') ? {
       id: 'feature_events_fallback',
       route: 'events',
       displayName: 'Events',
@@ -2310,7 +2313,7 @@ const Home = ({ onNavigate, onLogout }) => {
       icon_url: '/icons/quick-access/events.svg',
       quick_order: 90,
     } : null,
-    ff('feature_achievements') ? {
+    ff('feature_achievements') && isFeaturePlacedInHome('feature_achievements') ? {
       id: 'feature_achievements_fallback',
       route: 'achievements',
       displayName: 'Achievements',
@@ -2318,7 +2321,7 @@ const Home = ({ onNavigate, onLogout }) => {
       icon_url: '/icons/quick-access/directory.svg',
       quick_order: 92,
     } : null,
-    ff('feature_donation') ? {
+    ff('feature_donation') && isFeaturePlacedInHome('feature_donation') ? {
       id: 'feature_donation_fallback',
       route: 'donation',
       displayName: 'Donation',
@@ -2997,7 +3000,7 @@ const Home = ({ onNavigate, onLogout }) => {
                 </div>
               </div>
             ) : null,
-            gallery: ff('feature_gallery') ? (
+            gallery: ff('feature_gallery') && isFeaturePlacedInHome('feature_gallery') ? (
               galleryHomeMode === 'content' ? (
                 <div className="relative px-4 mt-5 mb-3" style={{ animation: resolveAnimation('gallery', 'zoomIn') }} key="gallery">
                   <GalleryContent variant="home" onNavigate={onNavigate} />
@@ -3142,9 +3145,16 @@ const Home = ({ onNavigate, onLogout }) => {
                     const spacingClass = groupIndex > 0 ? 'mt-4' : '';
                     if (group.type === 'content') {
                       const { action, ContentRenderer } = group;
+                      const contentKey = action.route === 'products'
+                        ? `quickaction-content-${action.id}-${selectedTrustId || 'none'}`
+                        : `quickaction-content-${action.id}`;
                       return (
-                        <div key={`quickaction-content-${action.id}`} className={spacingClass}>
-                          <ContentRenderer variant="home" onNavigate={onNavigate} />
+                        <div key={contentKey} className={spacingClass}>
+                          <ContentRenderer
+                            variant="home"
+                            onNavigate={onNavigate}
+                            selectedTrustId={action.route === 'products' ? selectedTrustId : undefined}
+                          />
                         </div>
                       );
                     }
@@ -3158,7 +3168,7 @@ const Home = ({ onNavigate, onLogout }) => {
               </div>
             ) : null,
 
-            sponsors: ff('feature_sponsors') ? (
+            sponsors: ff('feature_sponsors') && isFeaturePlacedInHome('feature_sponsors') ? (
               sponsorsHomeMode === 'content' ? (
                 <div className="px-4 mt-5 mb-4" style={{ animation: resolveAnimation('sponsors', 'cards') }} key="sponsors">
                   <SponsorsContent variant="home" onNavigate={onNavigate} />

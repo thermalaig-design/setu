@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  ArrowUp,
   ChevronLeft,
   ShoppingCart,
   Shirt,
@@ -66,8 +67,10 @@ const normalizeText = (value) => {
 
 const normalizeTrustId = (value) => normalizeText(value);
 
-const getTrustCandidates = () => {
-  const selectedTrustId = normalizeTrustId(localStorage.getItem('selected_trust_id'));
+const getTrustCandidates = (preferredTrustId = '') => {
+  const selectedTrustId = normalizeTrustId(
+    preferredTrustId || localStorage.getItem('selected_trust_id')
+  );
 
   return [...new Set([selectedTrustId].filter(Boolean))];
 };
@@ -80,6 +83,9 @@ function CategoryArt({
   colors,
   tall = false,
 }) {
+  const imageRef = useRef(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const Icon = ICONS[iconName] || Shirt;
   const frameClasses = variant === 'circle'
     ? 'h-[92px] w-[92px] rounded-full'
@@ -104,6 +110,26 @@ function CategoryArt({
     : 'h-6 w-6';
 
   const [start, end] = colors;
+  const shouldShowImage = Boolean(imageUrl) && !imageFailed;
+  const shouldShowImageSkeleton = shouldShowImage && !imageLoaded;
+
+  useEffect(() => {
+    setImageLoaded(false);
+    setImageFailed(false);
+
+    const checkCachedImage = () => {
+      const image = imageRef.current;
+      if (image?.complete && image.naturalWidth > 0) {
+        setImageLoaded(true);
+      }
+    };
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(checkCachedImage);
+    } else {
+      checkCachedImage();
+    }
+  }, [imageUrl]);
 
   return (
     <div
@@ -116,14 +142,29 @@ function CategoryArt({
           margin: frameAspectRatio === '1 / 1' ? '0 auto' : undefined,
         }}
       >
-      {imageUrl ? (
+      {shouldShowImageSkeleton ? (
+        <div className="ws-skeleton ws-image-skeleton" aria-hidden="true" />
+      ) : null}
+
+      {shouldShowImage ? (
         <img
+          ref={imageRef}
           src={imageUrl}
           alt={label}
           className={imageClasses}
           loading="lazy"
           decoding="async"
+          style={{
+            zIndex: 2,
+            opacity: imageLoaded ? 1 : 0,
+            transition: 'opacity 180ms ease',
+          }}
+          onLoad={() => {
+            setImageLoaded(true);
+          }}
           onError={(event) => {
+            setImageFailed(true);
+            setImageLoaded(false);
             event.currentTarget.style.display = 'none';
           }}
         />
@@ -132,14 +173,16 @@ function CategoryArt({
       <div
         className="absolute inset-0"
         style={{
-          background: imageUrl
+          zIndex: shouldShowImage ? 3 : 0,
+          background: shouldShowImage
             ? 'linear-gradient(180deg, color-mix(in srgb, var(--surface-color) 14%, transparent) 0%, color-mix(in srgb, var(--brand-navy) 10%, transparent) 100%)'
             : `linear-gradient(145deg, ${start} 0%, ${end} 100%)`,
+          pointerEvents: 'none',
         }}
       />
 
-      {!imageUrl ? (
-        <div className="absolute inset-0 flex items-center justify-center">
+      {!shouldShowImage ? (
+        <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 4 }}>
           <div
             className={`flex items-center justify-center rounded-full shadow-lg backdrop-blur-sm ${iconBoxClasses}`}
             style={{
@@ -269,7 +312,7 @@ function CardGrid({ section, onOpen }) {
                   key={item.id}
                   className="ws-tile"
                   type="button"
-                  onClick={() => onOpen(item.id)}
+                  onClick={() => onOpen(item)}
                 >
                   <CategoryArt
                     variant="card"
@@ -290,7 +333,10 @@ function CardGrid({ section, onOpen }) {
   );
 }
 
-export function CategoriesProductsContent({ variant = 'page' } = {}) {
+export function CategoriesProductsContent({
+  variant = 'page',
+  selectedTrustId: selectedTrustIdProp = '',
+} = {}) {
   const isPageVariant = variant === 'page';
   const navigate = useNavigate();
   const theme = useAppTheme();
@@ -303,6 +349,9 @@ export function CategoriesProductsContent({ variant = 'page' } = {}) {
   const [reloadToken, setReloadToken] = useState(0);
   const [wishlistItems, setWishlistItems] = useState(() => readWishlistItems());
   const [cartItems, setCartItems] = useState(() => readCartItems());
+  const [showJumpTop, setShowJumpTop] = useState(false);
+  const [jumpTopStyle, setJumpTopStyle] = useState(null);
+  const rootRef = useRef(null);
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -310,7 +359,7 @@ export function CategoriesProductsContent({ variant = 'page' } = {}) {
     const controller = new AbortController();
 
     const load = async () => {
-      const trustCandidates = getTrustCandidates();
+      const trustCandidates = getTrustCandidates(selectedTrustIdProp);
       const cached = readTrustCatalogCacheForCandidates(trustCandidates);
       const hasCachedPayload = Boolean(cached?.payload);
 
@@ -355,7 +404,7 @@ export function CategoriesProductsContent({ variant = 'page' } = {}) {
       active = false;
       controller.abort();
     };
-  }, [reloadToken]);
+  }, [reloadToken, selectedTrustIdProp]);
 
   useEffect(() => subscribeWishlist(setWishlistItems), []);
   useEffect(() => subscribeCart(setCartItems), []);
@@ -378,8 +427,89 @@ export function CategoriesProductsContent({ variant = 'page' } = {}) {
   const showLoading = loading && !hasVisibleContent;
   const showEmpty = !loading && !error && !hasVisibleContent;
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const updateJumpTopPlacement = () => {
+      const root = rootRef.current;
+      if (!root) {
+        setJumpTopStyle(null);
+        return;
+      }
+
+      const rect = root.getBoundingClientRect();
+      const right = Math.max(window.innerWidth - rect.right + 18, 18);
+      setJumpTopStyle({
+        right: `${right}px`,
+        bottom: 'max(22px, env(safe-area-inset-bottom))',
+      });
+    };
+
+    const handleScroll = () => {
+      updateJumpTopPlacement();
+
+      if (isPageVariant) {
+        const pageScrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+        const contentScrollTop = scrollRef.current?.scrollTop || 0;
+        setShowJumpTop(Math.max(pageScrollTop, contentScrollTop) > 320);
+        return;
+      }
+
+      const root = rootRef.current;
+      if (!root) {
+        setShowJumpTop(false);
+        return;
+      }
+
+      const rect = root.getBoundingClientRect();
+      setShowJumpTop(rect.top < -240 && rect.bottom > window.innerHeight * 0.45);
+    };
+
+    const target = isPageVariant ? scrollRef.current : window;
+    handleScroll();
+    target?.addEventListener('scroll', handleScroll, { passive: true });
+    if (isPageVariant) {
+      window.addEventListener('scroll', handleScroll, { passive: true });
+    }
+    window.addEventListener('resize', handleScroll);
+
+    return () => {
+      target?.removeEventListener('scroll', handleScroll);
+      if (isPageVariant) {
+        window.removeEventListener('scroll', handleScroll);
+      }
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [isPageVariant, hasVisibleContent]);
+  const openCardItem = (itemOrId) => {
+    if (itemOrId && typeof itemOrId === 'object') {
+      if (itemOrId.type === 'product') {
+        navigate(`/categories-products/list/${itemOrId.categoryId}/detail/${itemOrId.productId}`);
+        return;
+      }
+
+      navigate(`/categories-products/list/${itemOrId.categoryId || itemOrId.id}`);
+      return;
+    }
+
+    navigate(`/categories-products/list/${itemOrId}`);
+  };
+  const handleJumpToTop = () => {
+    if (isPageVariant) {
+      scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      return;
+    }
+
+    if (typeof window === 'undefined') return;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <main
+      ref={rootRef}
       className={isPageVariant ? 'min-h-screen flex flex-col' : undefined}
       style={isPageVariant ? {
         background: THEME.page,
@@ -503,7 +633,7 @@ export function CategoriesProductsContent({ variant = 'page' } = {}) {
                 <CardGrid
                   key={section.id}
                   section={section}
-                  onOpen={(id) => navigate(`/categories-products/list/${id}`)}
+                  onOpen={openCardItem}
                 />
               ))}
             </>
@@ -511,6 +641,18 @@ export function CategoriesProductsContent({ variant = 'page' } = {}) {
 
           <div style={{ height: 8 }} />
         </div>
+
+        <button
+          type="button"
+          className={`ws-jump-top ${showJumpTop ? 'ws-jump-top-visible' : ''}`}
+          style={jumpTopStyle || undefined}
+          onClick={handleJumpToTop}
+          aria-label="Jump to top"
+          aria-hidden={!showJumpTop}
+          tabIndex={showJumpTop ? 0 : -1}
+        >
+          <ArrowUp size={18} strokeWidth={2.2} />
+        </button>
       </div>
 
       <style>{`
@@ -523,6 +665,7 @@ export function CategoriesProductsContent({ variant = 'page' } = {}) {
         }
 
         .ws-page {
+          position: relative;
           display: flex;
           flex-direction: column;
           flex: 1;
@@ -619,6 +762,33 @@ export function CategoriesProductsContent({ variant = 'page' } = {}) {
           line-height: 1.25;
         }
 
+        .ws-jump-top {
+          position: fixed;
+          right: max(18px, env(safe-area-inset-right));
+          bottom: max(22px, env(safe-area-inset-bottom));
+          z-index: 35;
+          width: 46px;
+          height: 46px;
+          border: 0;
+          border-radius: 999px;
+          background: ${THEME.buttonBg};
+          color: ${THEME.buttonText};
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 14px 28px color-mix(in srgb, var(--brand-navy) 24%, transparent);
+          opacity: 0;
+          transform: translateY(12px) scale(0.96);
+          pointer-events: none;
+          transition: opacity 0.18s ease, transform 0.18s ease;
+        }
+
+        .ws-jump-top-visible {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+          pointer-events: auto;
+        }
+
         .ws-header-icon-btn {
           position: relative;
           width: 28px;
@@ -654,6 +824,12 @@ export function CategoriesProductsContent({ variant = 'page' } = {}) {
           position: relative;
           overflow: hidden;
           background: ${SKELETON_BG};
+        }
+
+        .ws-image-skeleton {
+          position: absolute;
+          inset: 0;
+          z-index: 1;
         }
 
         .ws-skeleton::after {

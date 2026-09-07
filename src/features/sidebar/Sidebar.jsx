@@ -50,6 +50,8 @@ const resolveSidebarIcon = (featureKey, route) => {
   return PhoneCall;
 };
 
+const normalizeDisplayInApp = (value) => String(value || 'home').trim().toLowerCase();
+
 const toTitleCase = (value = '') =>
   String(value || '')
     .trim()
@@ -650,24 +652,10 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
   const menuItems = Object.entries(flagsData)
     .filter(([key, meta]) => {
       const resolvedRoute = normalizeSidebarRoute(meta?.route, key);
-      const normalizedKey = String(key || '').trim().toLowerCase().replace(/_/g, '-');
-      const isContactUs = resolvedRoute === 'contact-us'
-        || normalizedKey === 'contactus'
-        || normalizedKey === 'contact-us'
-        || normalizedKey === 'feature-contact-us';
-      const isMyFamily = resolvedRoute === 'my-family'
-        || normalizedKey === 'myfamily'
-        || normalizedKey === 'my-family'
-        || normalizedKey === 'feature-my-family';
-      const isNominationDetails = resolvedRoute === 'nomination-details'
-        || normalizedKey === 'nominationdetails'
-        || normalizedKey === 'nomination-details'
-        || normalizedKey === 'feature-nomination-details';
-      const isAddCommunity = resolvedRoute === 'add-community'
-        || normalizedKey === 'addcommunity'
-        || normalizedKey === 'add-community'
-        || normalizedKey === 'feature-add-community';
-      return Boolean(key) && meta?.is_enabled && (isContactUs || isMyFamily || isNominationDetails || isAddCommunity);
+      return Boolean(key)
+        && meta?.is_enabled
+        && normalizeDisplayInApp(meta?.display_in_app) === 'sidebar'
+        && Boolean(resolvedRoute);
     })
     .map(([key, meta]) => ({
       id: normalizeSidebarRoute(meta?.route, key),

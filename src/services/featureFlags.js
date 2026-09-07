@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 
-const CACHE_KEY = 'feature_flags_cache_v3';
+const CACHE_KEY = 'feature_flags_cache_v4';
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 const FEATURE_KEY_ALIASES = {
@@ -118,7 +118,7 @@ export const fetchFeatureFlags = async (trustId = null, opts = {}) => {
 
     const { data: rows, error } = await supabase
       .from('feature_flags')
-      .select('is_enabled, display_name, tagline, icon_url, route, quick_order, features!inner(name, subname)')
+      .select('is_enabled, display_name, tagline, icon_url, route, quick_order, display_in_app, features!inner(name, subname)')
       .eq('trust_id', trustId)
       .eq('tier', tier);
 
@@ -144,6 +144,7 @@ export const fetchFeatureFlags = async (trustId = null, opts = {}) => {
         icon_url: row.icon_url || null,
         route: row.route || null,
         quick_order: row.quick_order ?? null,
+        display_in_app: row.display_in_app || 'home',
       };
     });
 
