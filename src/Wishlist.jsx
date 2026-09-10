@@ -809,7 +809,7 @@ function Wishlist() {
       return;
     }
 
-    navigate(`/categories-products/list/${categoryId}/detail/${productId}`);
+    navigate(`/categories-products/list/${encodeURIComponent(categoryId)}/detail/${encodeURIComponent(productId)}`);
   };
 
   return (

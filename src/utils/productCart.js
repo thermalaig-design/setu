@@ -260,8 +260,6 @@ const resolveUnitTaxAmount = (price, unitBaseAmount) => {
 };
 
 const normalizeRpcValue = (value) => {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
   return normalizeText(value);
 };
 
@@ -703,7 +701,9 @@ const getPurchaseRowTimestamp = (row = {}) => {
 const comparePurchaseRowsNewest = (left = {}, right = {}) => {
   const timeDiff = getPurchaseRowTimestamp(right) - getPurchaseRowTimestamp(left);
   if (timeDiff !== 0) return timeDiff;
-  return normalizeAmount(right?.id || right?.purchase_id) - normalizeAmount(left?.id || left?.purchase_id);
+  const rightId = normalizeText(right?.id || right?.purchase_id);
+  const leftId = normalizeText(left?.id || left?.purchase_id);
+  return rightId.localeCompare(leftId);
 };
 
 const pickLatestCartRowsByPrice = (rows = []) => {

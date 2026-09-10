@@ -87,10 +87,12 @@ const getPersistTrustCacheIndexKey = (trustId) => `theme_cache_persist_trust_${T
 const SHOP_ROOT_PATH = '/categories-products';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const isUuid = (value) => UUID_RE.test(String(value || '').trim());
-const resolvePositiveId = (value) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+const resolveRouteId = (value) => {
+  const text = String(value ?? '').trim();
+  if (!text) return '';
+  return ['null', 'undefined', 'nan'].includes(text.toLowerCase()) ? '' : text;
 };
+const encodeRouteId = (value) => encodeURIComponent(resolveRouteId(value));
 
 const safeParse = (value) => {
   try {
@@ -209,7 +211,7 @@ const applyThemeToDocument = (theme) => {
 const CategoriesProductListRoute = () => {
   const navigate = useNavigate();
   const { categoryId } = useParams();
-  const resolvedCategoryId = resolvePositiveId(categoryId);
+  const resolvedCategoryId = resolveRouteId(categoryId);
 
   if (!resolvedCategoryId) {
     return <Navigate to={SHOP_ROOT_PATH} replace />;
@@ -220,9 +222,9 @@ const CategoriesProductListRoute = () => {
       categoryId={resolvedCategoryId}
       onBack={() => navigate(-1)}
       onOpenProduct={(productId) => {
-        const resolvedProductId = resolvePositiveId(productId);
+        const resolvedProductId = resolveRouteId(productId);
         if (!resolvedProductId) return;
-        navigate(`${SHOP_ROOT_PATH}/list/${resolvedCategoryId}/detail/${resolvedProductId}`);
+        navigate(`${SHOP_ROOT_PATH}/list/${encodeRouteId(resolvedCategoryId)}/detail/${encodeRouteId(resolvedProductId)}`);
       }}
     />
   );
@@ -231,8 +233,8 @@ const CategoriesProductListRoute = () => {
 const CategoriesProductDetailRoute = () => {
   const navigate = useNavigate();
   const { categoryId, productId } = useParams();
-  const resolvedCategoryId = resolvePositiveId(categoryId);
-  const resolvedProductId = resolvePositiveId(productId);
+  const resolvedCategoryId = resolveRouteId(categoryId);
+  const resolvedProductId = resolveRouteId(productId);
 
   if (!resolvedCategoryId || !resolvedProductId) {
     return <Navigate to={SHOP_ROOT_PATH} replace />;

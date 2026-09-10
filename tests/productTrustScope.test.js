@@ -1956,3 +1956,103 @@ test('cart refresh preserves local attribute options when remote enrichment has 
   assert.deepEqual(items[0].attribute_values.map((row) => row.value), ['S', 'M', 'L']);
   assert.deepEqual(cartUtils.readCartItems('trust-local-attrs')[0].attribute_values.map((row) => row.value), ['S', 'M', 'L']);
 });
+
+test('cart and wishlist preserve UUID product category and price identifiers as strings', async () => {
+  const trustId = 'trust-uuid-flow';
+  const productId = '550e8400-e29b-41d4-a716-446655440000';
+  const categoryId = '650e8400-e29b-41d4-a716-446655440001';
+  const priceId = '750e8400-e29b-41d4-a716-446655440002';
+  const cartPurchaseId = '850e8400-e29b-41d4-a716-446655440003';
+  const wishlistPurchaseId = '950e8400-e29b-41d4-a716-446655440004';
+
+  createEnvironment({
+    selected_trust_id: trustId,
+    last_selected_trust_id: trustId,
+    user: createUserEntry()
+  });
+
+  const product = {
+    id: productId,
+    category_id: categoryId,
+    product_name: 'UUID Product',
+    price: {
+      id: priceId,
+      member_price: 499,
+      price_after_discount: 499,
+      total_payable: 499
+    }
+  };
+
+  const cartRequests = [];
+  cartUtils.setCartPurchaseRpcOverrideForTests(async (request) => {
+    cartRequests.push(request);
+    return {
+      data: {
+        success: true,
+        purchases: [{
+          id: cartPurchaseId,
+          type: 'cart',
+          status: 'add_to_cart',
+          trust_id: trustId,
+          product_id: productId,
+          product_price_id: request.p_payload.product_price_id,
+          quantity: request.p_payload.quantity
+        }]
+      }
+    };
+  });
+
+  await cartUtils.setCartProductQuantity(product, {
+    trustId,
+    categoryId,
+    quantity: 2,
+    price: product.price
+  });
+
+  assert.equal(cartRequests[0].p_payload.product_price_id, priceId);
+  assert.equal(typeof cartRequests[0].p_payload.product_price_id, 'string');
+  assert.equal(cartUtils.getCartKey(productId, trustId), `${trustId}:${productId}`);
+  const [cartItem] = cartUtils.readCartItems(trustId);
+  assert.equal(cartItem.id, productId);
+  assert.equal(cartItem.category_id, categoryId);
+  assert.equal(cartItem.product_price_id, priceId);
+  assert.equal(cartItem.purchase_id, cartPurchaseId);
+  assert.equal(cartItem.quantity, 2);
+  assert.equal(cartUtils.getCartItemQuantity(productId, trustId), 2);
+
+  const wishlistRequests = [];
+  wishlistUtils.setWishlistPurchaseRpcOverrideForTests(async (request) => {
+    wishlistRequests.push(request);
+    return {
+      data: {
+        success: true,
+        purchases: [{
+          id: wishlistPurchaseId,
+          type: 'wishlist',
+          status: 'wishlist',
+          trust_id: trustId,
+          product_id: productId,
+          product_price_id: request.p_payload.product_price_id,
+          quantity: request.p_payload.quantity
+        }]
+      }
+    };
+  });
+
+  const result = await wishlistUtils.addWishlistProductAsync(product, {
+    trustId,
+    categoryId,
+    price: product.price
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(wishlistRequests[0].p_payload.product_price_id, priceId);
+  assert.equal(typeof wishlistRequests[0].p_payload.product_price_id, 'string');
+  const [wishlistItem] = wishlistUtils.readWishlistItems(trustId);
+  assert.equal(wishlistItem.id, productId);
+  assert.equal(wishlistItem.category_id, categoryId);
+  assert.equal(wishlistItem.product_price_id, priceId);
+  assert.equal(wishlistItem.purchase_id, wishlistPurchaseId);
+  assert.notEqual(wishlistItem.id, 'NaN');
+  assert.notEqual(wishlistItem.product_price_id, '0');
+});

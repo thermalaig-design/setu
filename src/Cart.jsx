@@ -973,7 +973,7 @@ function Cart() {
       return;
     }
 
-    navigate(`/categories-products/list/${categoryId}/detail/${productId}`);
+    navigate(`/categories-products/list/${encodeURIComponent(categoryId)}/detail/${encodeURIComponent(productId)}`);
   };
 
   const handleClearCart = async () => {

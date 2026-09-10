@@ -1993,7 +1993,7 @@ const ProductDetail = ({ categoryId, productId, onBack }) => {
                 <button
                   type="button"
                   className="ws-breadcrumb-link"
-                  onClick={() => navigate(`/categories-products/list/${category.id}`)}
+                  onClick={() => navigate(`/categories-products/list/${encodeURIComponent(pickText(category.id))}`)}
                 >
                   {capitalizeFirst(category.name)}
                 </button>

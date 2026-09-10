@@ -178,8 +178,6 @@ const buildInitialForm = () => {
 const formatCurrency = (value) => `Rs. ${Number(value || 0).toLocaleString('en-IN')}`;
 
 const normalizeRpcValue = (value) => {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
   return normalizeText(value);
 };
 

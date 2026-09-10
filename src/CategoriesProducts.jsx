@@ -481,18 +481,26 @@ export function CategoriesProductsContent({
       window.removeEventListener('resize', handleScroll);
     };
   }, [isPageVariant, hasVisibleContent]);
+  const encodeRouteId = (value) => encodeURIComponent(normalizeText(value));
   const openCardItem = (itemOrId) => {
     if (itemOrId && typeof itemOrId === 'object') {
       if (itemOrId.type === 'product') {
-        navigate(`/categories-products/list/${itemOrId.categoryId}/detail/${itemOrId.productId}`);
+        const categoryId = normalizeText(itemOrId.categoryId);
+        const productId = normalizeText(itemOrId.productId);
+        if (!categoryId || !productId) return;
+        navigate(`/categories-products/list/${encodeRouteId(categoryId)}/detail/${encodeRouteId(productId)}`);
         return;
       }
 
-      navigate(`/categories-products/list/${itemOrId.categoryId || itemOrId.id}`);
+      const categoryId = normalizeText(itemOrId.categoryId || itemOrId.id);
+      if (!categoryId) return;
+      navigate(`/categories-products/list/${encodeRouteId(categoryId)}`);
       return;
     }
 
-    navigate(`/categories-products/list/${itemOrId}`);
+    const categoryId = normalizeText(itemOrId);
+    if (!categoryId) return;
+    navigate(`/categories-products/list/${encodeRouteId(categoryId)}`);
   };
   const handleJumpToTop = () => {
     if (isPageVariant) {
@@ -625,7 +633,7 @@ export function CategoriesProductsContent({
               {sliderEntries.length > 0 ? (
                 <CircleSlider
                   entries={sliderEntries}
-                  onOpen={(id) => navigate(`/categories-products/list/${id}`)}
+                  onOpen={(id) => navigate(`/categories-products/list/${encodeRouteId(id)}`)}
                 />
               ) : null}
 
