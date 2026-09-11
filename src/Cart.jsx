@@ -902,7 +902,7 @@ function Cart() {
 
     closeAttributeMenu();
     try {
-      const updated = await removeCartProduct(item.id, item.trust_id);
+      const updated = await removeCartProduct(item.id, item.trust_id, { item });
       setItems(updated);
       showToast(toastLabel);
       return updated;
@@ -925,6 +925,7 @@ function Cart() {
     closeAttributeMenu();
     try {
       const result = await moveCartProductToWishlist(item.id, item.trust_id, {
+        item,
         quantity: getCartItemPricing(item).quantity || Number(item.quantity) || 1,
         selectedAttributes: item.selected_attributes || {},
       });
