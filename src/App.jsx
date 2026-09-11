@@ -52,6 +52,8 @@ import NominationDetails from './NominationDetails';
 import AddCommunity from './AddCommunity';
 import TrustIdCard from './TrustIdCard';
 import AppVersionUpdatePrompt from './components/AppVersionUpdatePrompt';
+import TenantLanding from './TenantLanding';
+import { useTenant } from './context/TenantContext';
 import { getCurrentNotificationContext, matchesNotificationForContext } from './services/notificationAudience';
 import { initPushNotifications } from './services/pushNotificationService';
 import { createUserNotification } from './services/api';
@@ -256,6 +258,7 @@ const HospitalTrusteeApp = () => {
   const PUBLIC_ROUTES = ['/login', '/otp-verification', '/special-otp-verification', '/terms-and-conditions', '/privacy-policy', '/developers', '/vip-login'];
   const navigate = useNavigate();
   const location = useLocation();
+  const { installedTrustId: tenantInstalledTrustId, tenantTrust } = useTenant();
   const [isMember] = useState(true);
   const shouldRestoreMemberState =
     location.pathname === '/member-details'
@@ -304,6 +307,17 @@ const HospitalTrusteeApp = () => {
     return '';
   });
   const resolveDefaultThemeTrust = () => {
+    // Installed/tenant Trust identity (from a white-label /<slug> link) takes
+    // priority for the pre-login/auth theme so a customer-branded PWA shows
+    // its own colors before the user ever logs in. This does not affect
+    // `activeTrustId`/`selected_trust_id`, which still governs the app once
+    // a user is inside it.
+    if (tenantInstalledTrustId) {
+      const tenantName = (tenantTrust && String(tenantTrust.id) === String(tenantInstalledTrustId) && tenantTrust.name)
+        || BASE_TRUST_NAME;
+      return { id: tenantInstalledTrustId, name: tenantName };
+    }
+
     try {
       const cachedDefault = localStorage.getItem('default_trust_cache');
       if (cachedDefault) {
@@ -1581,6 +1595,10 @@ const HospitalTrusteeApp = () => {
         <Route
           path="/privacy-policy"
           element={<PrivacyPolicy />}
+        />
+        <Route
+          path="/:appSlug"
+          element={<TenantLanding />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

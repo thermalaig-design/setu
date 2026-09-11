@@ -4,6 +4,7 @@ import { useBackNavigation } from './hooks';
 import { useTrustDataVersion } from './hooks/useTrustDataVersion';
 import { checkPhoneNumber } from './services/authService';
 import { fetchTrustById } from './services/trustService';
+import { useTenant } from './context/TenantContext';
 
 const TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
 const LOGIN_TRUST_CACHE_KEY = 'cached_base_trust_info';
@@ -66,13 +67,25 @@ function Login() {
   const navigate = useNavigate();
   useBackNavigation();
   const authDefaultTrust = resolveAuthDefaultTrust();
-  const { displayTrustVersion } = useTrustDataVersion(authDefaultTrust.id);
+  const { installedTrustId, tenantTrust } = useTenant();
+  const isTenantMode = Boolean(installedTrustId);
+  // Priority 1: installed/tenant Trust (white-label /<slug> identity).
+  // Priority 2: existing selected/default Trust fallback (unchanged).
+  const effectiveTrust = isTenantMode
+    ? { id: installedTrustId, name: '' }
+    : authDefaultTrust;
+  const { displayTrustVersion } = useTrustDataVersion(effectiveTrust.id);
 
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [focused, setFocused] = useState(false);
-  const [_trustInfo, setTrustInfo] = useState(() => getCachedBaseTrust(authDefaultTrust.id) || null);
+  const [trustInfo, setTrustInfo] = useState(() => {
+    if (isTenantMode && tenantTrust && String(tenantTrust.id) === String(installedTrustId)) {
+      return tenantTrust;
+    }
+    return getCachedBaseTrust(effectiveTrust.id) || null;
+  });
 
   useEffect(() => {
     const user = localStorage.getItem('user');
@@ -84,22 +97,32 @@ function Login() {
     try { localStorage.removeItem('cached_trust_info'); } catch { /* ignore */ }
   }, []);
 
+  // Pick up tenant Trust info as soon as TenantContext resolves it (e.g. it
+  // was already resolved earlier this session), instead of waiting on a
+  // separate fetch below.
+  useEffect(() => {
+    if (isTenantMode && tenantTrust && String(tenantTrust.id) === String(installedTrustId)) {
+      setTrustInfo(tenantTrust);
+      setCachedBaseTrust(tenantTrust, installedTrustId);
+    }
+  }, [isTenantMode, tenantTrust, installedTrustId]);
+
   useEffect(() => {
     let active = true;
     const loadTrust = async () => {
       try {
-        if (!authDefaultTrust.id) return;
-        const trust = await fetchTrustById(authDefaultTrust.id);
+        if (!effectiveTrust.id) return;
+        const trust = await fetchTrustById(effectiveTrust.id);
         if (!active || !trust) return;
         setTrustInfo(trust);
-        setCachedBaseTrust(trust, authDefaultTrust.id);
+        setCachedBaseTrust(trust, effectiveTrust.id);
       } catch (err) {
         console.warn('[Login] Failed to refresh base trust info:', err?.message || err);
       }
     };
     loadTrust();
     return () => { active = false; };
-  }, [authDefaultTrust.id]);
+  }, [effectiveTrust.id]);
 
   const handleCheckPhone = async (e) => {
     e.preventDefault();
@@ -136,6 +159,21 @@ function Login() {
         <div style={styles.accentBar} />
 
         <div style={styles.cardBody}>
+
+          {/* Tenant Trust branding (white-label /<slug> installs only) */}
+          {isTenantMode && trustInfo?.name && (
+            <div style={styles.tenantBrand}>
+              {trustInfo.icon_url && (
+                <img
+                  src={trustInfo.icon_url}
+                  alt={trustInfo.name}
+                  style={styles.tenantLogo}
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+              )}
+              <span style={styles.tenantName}>{trustInfo.name}</span>
+            </div>
+          )}
 
           {/* Heading */}
           <div style={styles.headingGroup}>
@@ -276,6 +314,25 @@ const styles = {
   },
   cardBody: {
     padding: '32px 24px 28px',
+  },
+  tenantBrand: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    marginBottom: '14px',
+  },
+  tenantLogo: {
+    width: '28px',
+    height: '28px',
+    borderRadius: '7px',
+    objectFit: 'cover',
+  },
+  tenantName: {
+    fontSize: '13px',
+    fontWeight: 700,
+    color: '#d4af37',
+    letterSpacing: '0.3px',
   },
   headingGroup: {
     marginBottom: '28px',

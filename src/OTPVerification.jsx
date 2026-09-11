@@ -7,6 +7,7 @@ import { fetchActiveTrustsByMobile, fetchMemberTrustMemberships, fetchTrustById 
 import { logUserSessionEvent } from './services/sessionAuditService';
 import { persistUserSession } from './utils/storageUtils';
 import { setLoginTermsPromptPending } from './utils/legalContent';
+import { useTenant } from './context/TenantContext';
 
 const TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
 const LOGIN_TRUST_CACHE_KEY = 'cached_base_trust_info';
@@ -71,6 +72,7 @@ function OTPVerification() {
   const location = useLocation();
   useBackNavigation(() => navigate('/login'));
   const authDefaultTrust = resolveAuthDefaultTrust();
+  const { installedTrustId, tenantTrust } = useTenant();
 
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -257,13 +259,34 @@ function OTPVerification() {
     const baseTrustId = normalizeText(TRUST_ID || authDefaultTrust.id);
     const baseMembership = selectedMemberships.find((membership) => normalizeText(membership?.trust_id) === baseTrustId) || null;
     const fallbackMembership = selectedMemberships.find((membership) => membership?.is_active !== false) || selectedMemberships[0] || null;
-    const selectedTrustId = normalizeText(baseMembership?.trust_id) || normalizeText(fallbackMembership?.trust_id) || baseTrustId;
-    const selectedTrustName = normalizeText(
-      baseMembership?.trust_name ||
-      trustInfo?.name ||
-      authDefaultTrust?.name ||
-      localStorage.getItem('selected_trust_name')
-    );
+
+    // Installed/tenant identity (white-label /<slug> app): if the logged-in
+    // member actually belongs to the installed Trust, that Trust becomes the
+    // selected Trust for this session. If not, we fall back to the existing
+    // membership-based selection below rather than silently granting access
+    // to a Trust the member does not belong to.
+    const tenantTrustId = normalizeText(installedTrustId);
+    const tenantMembership = tenantTrustId
+      ? selectedMemberships.find((membership) => normalizeText(membership?.trust_id) === tenantTrustId) || null
+      : null;
+
+    if (tenantTrustId && !tenantMembership) {
+      console.warn('[OTP] Logged-in member is not part of the installed tenant Trust; using existing membership selection instead.', {
+        tenantTrustId
+      });
+    }
+
+    const selectedTrustId = tenantMembership
+      ? tenantTrustId
+      : (normalizeText(baseMembership?.trust_id) || normalizeText(fallbackMembership?.trust_id) || baseTrustId);
+    const selectedTrustName = tenantMembership
+      ? normalizeText(tenantMembership?.trust_name || tenantTrust?.name || authDefaultTrust?.name)
+      : normalizeText(
+        baseMembership?.trust_name ||
+        trustInfo?.name ||
+        authDefaultTrust?.name ||
+        localStorage.getItem('selected_trust_name')
+      );
 
     localStorage.setItem('selected_trust_id', String(selectedTrustId));
     localStorage.setItem(LAST_SELECTED_TRUST_ID_KEY, String(selectedTrustId));

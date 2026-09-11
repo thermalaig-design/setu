@@ -326,6 +326,25 @@ export const fetchTrustById = async (id) => {
   return data || null;
 };
 
+export const fetchTrustByAppSlug = async (appSlug) => {
+  const normalizedSlug = normalizeText(appSlug).toLowerCase();
+  if (!normalizedSlug) return null;
+
+  const { data, error } = await supabase
+    .from('Trust')
+    .select('id,name,icon_url,app_slug,pwa_icon_192_url,pwa_icon_512_url,pwa_theme_color,pwa_background_color,pwa_enabled,version')
+    .eq('app_slug', normalizedSlug)
+    .eq('pwa_enabled', true)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('Error fetching trust by app slug:', error);
+    return null;
+  }
+
+  return data || null;
+};
+
 export const fetchShareAppLinksByTrustId = async (trustId) => {
   const normalizedTrustId = String(trustId || '').trim();
   if (!normalizedTrustId) return null;
