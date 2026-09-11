@@ -2,6 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { useTenant } from './context/TenantContext';
 import { isReservedSlug } from './constants/reservedRoutes';
+import { fetchMemberTrustMemberships } from './services/trustService';
+import { getUserHospitalMemberships } from './utils/storageUtils';
+
+const LAST_SELECTED_TRUST_ID_KEY = 'last_selected_trust_id';
+const normalizeText = (value) => String(value || '').trim();
 
 const isIosSafari = () => {
   if (typeof navigator === 'undefined') return false;
@@ -25,6 +30,8 @@ function TenantLanding() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [installOutcome, setInstallOutcome] = useState('');
   const [resolvedOnce, setResolvedOnce] = useState(false);
+  const [checkingMembership, setCheckingMembership] = useState(false);
+  const [membershipMessage, setMembershipMessage] = useState('');
 
   const reserved = isReservedSlug(appSlug);
 
@@ -98,8 +105,61 @@ function TenantLanding() {
     setInstallOutcome(isIosSafari() ? 'ios-instructions' : 'unsupported');
   };
 
-  const handleContinueInBrowser = () => {
-    navigate('/login');
+  const handleContinueInBrowser = async () => {
+    setMembershipMessage('');
+
+    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    const rawUser = isLoggedIn ? localStorage.getItem('user') : null;
+    let user = null;
+    try {
+      user = rawUser ? JSON.parse(rawUser) : null;
+    } catch {
+      user = null;
+    }
+
+    if (!isLoggedIn || !user) {
+      navigate('/login');
+      return;
+    }
+
+    const tenantTrustId = normalizeText(tenantTrust?.id);
+    const membersId = user.members_id || user.member_id || user.id || null;
+    const membershipNumber = user.membership_number || user['Membership number'] || '';
+
+    setCheckingMembership(true);
+    try {
+      // Reuse the same membership-lookup service OTPVerification.jsx uses to
+      // verify Trust membership, instead of introducing a second model.
+      let memberships = [];
+      try {
+        memberships = await fetchMemberTrustMemberships({ membersId, membershipNumber });
+      } catch (fetchErr) {
+        console.warn('[TenantLanding] Live membership check failed, using cached memberships:', fetchErr?.message || fetchErr);
+        memberships = getUserHospitalMemberships(user);
+      }
+
+      const tenantMembership = (Array.isArray(memberships) ? memberships : [])
+        .find((membership) => normalizeText(membership?.trust_id) === tenantTrustId);
+
+      if (tenantMembership) {
+        const trustName = normalizeText(tenantMembership.trust_name || tenantTrust?.name);
+        localStorage.setItem('selected_trust_id', tenantTrustId);
+        localStorage.setItem(LAST_SELECTED_TRUST_ID_KEY, tenantTrustId);
+        if (trustName) localStorage.setItem('selected_trust_name', trustName);
+        window.dispatchEvent(new CustomEvent('trust-changed', {
+          detail: { trustId: tenantTrustId, trustName: trustName || null, source: 'tenant-continue-in-browser' }
+        }));
+        navigate('/', { replace: true });
+        return;
+      }
+
+      setMembershipMessage(`Your account is not a member of ${tenantTrust?.name || 'this'}. Please log in with the mobile number registered for this Trust.`);
+    } catch (err) {
+      console.warn('[TenantLanding] Membership verification failed:', err?.message || err);
+      setMembershipMessage('Unable to verify your membership right now. Please try again.');
+    } finally {
+      setCheckingMembership(false);
+    }
   };
 
   return (
@@ -124,9 +184,18 @@ function TenantLanding() {
           Install App
         </button>
 
-        <button type="button" onClick={handleContinueInBrowser} style={styles.continueBtn}>
-          Continue in Browser
+        <button
+          type="button"
+          onClick={handleContinueInBrowser}
+          disabled={checkingMembership}
+          style={{ ...styles.continueBtn, ...(checkingMembership ? styles.continueBtnDisabled : {}) }}
+        >
+          {checkingMembership ? 'Checking…' : 'Continue in Browser'}
         </button>
+
+        {membershipMessage && (
+          <p style={styles.membershipMessage}>{membershipMessage}</p>
+        )}
 
         {installOutcome === 'ios-instructions' && (
           <p style={styles.instructions}>
@@ -239,6 +308,16 @@ const styles = {
     fontWeight: 600,
     fontSize: '14px',
     cursor: 'pointer',
+  },
+  continueBtnDisabled: {
+    opacity: 0.6,
+    cursor: 'not-allowed',
+  },
+  membershipMessage: {
+    color: '#f5c842',
+    fontSize: '12px',
+    marginTop: '4px',
+    lineHeight: 1.4,
   },
   instructions: {
     color: '#a8a8a8',
