@@ -260,7 +260,7 @@ function OTPVerification() {
     const baseMembership = selectedMemberships.find((membership) => normalizeText(membership?.trust_id) === baseTrustId) || null;
     const fallbackMembership = selectedMemberships.find((membership) => membership?.is_active !== false) || selectedMemberships[0] || null;
 
-    // Installed/tenant identity (white-label /<slug> app): if the logged-in
+    // Installed/tenant identity (white-label /app/<slug> app): if the logged-in
     // member actually belongs to the installed Trust, that Trust becomes the
     // selected Trust for this session. If not, we fall back to the existing
     // membership-based selection below rather than silently granting access

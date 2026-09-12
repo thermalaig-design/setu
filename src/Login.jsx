@@ -69,7 +69,7 @@ function Login() {
   const authDefaultTrust = resolveAuthDefaultTrust();
   const { installedTrustId, tenantTrust } = useTenant();
   const isTenantMode = Boolean(installedTrustId);
-  // Priority 1: installed/tenant Trust (white-label /<slug> identity).
+  // Priority 1: installed/tenant Trust (white-label /app/<slug> identity).
   // Priority 2: existing selected/default Trust fallback (unchanged).
   const effectiveTrust = isTenantMode
     ? { id: installedTrustId, name: '' }
@@ -160,7 +160,7 @@ function Login() {
 
         <div style={styles.cardBody}>
 
-          {/* Tenant Trust branding (white-label /<slug> installs only) */}
+          {/* Tenant Trust branding (white-label /app/<slug> installs only) */}
           {isTenantMode && trustInfo?.name && (
             <div style={styles.tenantBrand}>
               {trustInfo.icon_url && (

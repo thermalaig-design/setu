@@ -43,13 +43,16 @@ export default defineConfig(({ command, mode }) => {
         // never let this plugin generate/link a static one.
         manifest: false,
         injectRegister: 'auto',
-        // Assets are built with base '/_setu-app/', but page routes like
-        // /setu, /abc-association, /login and / are served from the domain
-        // root. The service worker itself must be registered at root scope
-        // '/' (independent of the asset base) so it can control every one of
-        // those tenant/app routes instead of being confined to /_setu-app/.
+        // Assets are built with base '/_setu-app/', but the service worker
+        // registration script itself is still served from the domain root
+        // (base: '/', independent of the asset base). Tenant web apps are
+        // intentionally grouped under /app/<slug> (e.g. /app/setu,
+        // /app/abc-association), so the SW's effective scope is narrowed to
+        // that prefix — it controls those tenant routes without reaching
+        // into unrelated top-level routes (/login, /notices, etc.) or the
+        // separate marketing site at '/'.
         base: '/',
-        scope: '/',
+        scope: '/app/',
         // Only ever register a service worker for production builds — never
         // during `npm run dev`.
         devOptions: {
@@ -59,14 +62,15 @@ export default defineConfig(({ command, mode }) => {
           // The app's main bundle exceeds workbox's default 2 MiB precache
           // limit; raise it so the build doesn't fail precaching that asset.
           maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
-          // Disable Workbox's navigation fallback. With scope '/', generateSW
-          // otherwise auto-registers a NavigationRoute that serves the cached
-          // index.html for every navigation under that scope — including
-          // /<slug> routes like /setu, which Nginx already resolves correctly
-          // to the member-app index.html. Without this, the service worker
-          // hijacks those document navigations and replaces them with the
-          // root site's (404) index.html instead of letting them hit the
-          // network/Nginx normally.
+          // Disable Workbox's navigation fallback. With scope '/app/',
+          // generateSW otherwise auto-registers a NavigationRoute that
+          // serves the cached index.html for every navigation under that
+          // scope — including /app/<slug> routes like /app/setu, which
+          // Nginx already resolves correctly to the member-app index.html.
+          // Without this, the service worker hijacks those document
+          // navigations and replaces them with the root site's (404)
+          // index.html instead of letting them hit the network/Nginx
+          // normally.
           navigateFallback: null
         }
       })

@@ -12,10 +12,11 @@ const normalizeText = (value) => String(value || '').trim();
 
 // Module-scoped (not component state): survives TenantLanding unmount/remount
 // caused by in-app SPA navigation (e.g. open Notices, then go back to
-// /<slug>), but resets on a real page reload since the module re-evaluates
-// from scratch then. Without this, every "back to /<slug>" remount re-ran
-// the membership check and flashed the "Opening <Trust>…" loading screen,
-// even though the standalone session was already verified moments earlier.
+// /app/<slug>), but resets on a real page reload since the module
+// re-evaluates from scratch then. Without this, every "back to /app/<slug>"
+// remount re-ran the membership check and flashed the "Opening <Trust>…"
+// loading screen, even though the standalone session was already verified
+// moments earlier.
 const verifiedStandaloneEntries = new Set();
 
 const getUserSessionKey = () => {
@@ -194,9 +195,9 @@ function TenantLanding({ onNavigate, onLogout, isMember } = {}) {
   const [resolvedOnce, setResolvedOnce] = useState(() => alreadyResolvedThisSlug);
   const [membershipMessage, setMembershipMessage] = useState('');
   // Standalone (installed PWA) sessions render Home in place instead of
-  // navigating to '/', so the browser stays on /<appSlug> — see
+  // navigating to '/', so the browser stays on /app/<appSlug> — see
   // enterTenantTrust below. Initialized synchronously from the same-session
-  // verification cache so remounting on /<slug> (in-app back navigation)
+  // verification cache so remounting on /app/<slug> (in-app back navigation)
   // renders Home immediately instead of flashing the membership-check
   // spinner again.
   const [showTenantHome, setShowTenantHome] = useState(() => {
@@ -232,7 +233,7 @@ function TenantLanding({ onNavigate, onLogout, isMember } = {}) {
   // Called by the standalone (installed PWA) auto-entry effect below: verifies
   // the logged-in member actually belongs to this Trust, switches
   // selected_trust_id to it, and renders Home in place (staying on
-  // /<appSlug>) instead of navigating to '/'.
+  // /app/<appSlug>) instead of navigating to '/'.
   const enterTenantTrust = useCallback(async () => {
     setMembershipMessage('');
 
@@ -277,10 +278,10 @@ function TenantLanding({ onNavigate, onLogout, isMember } = {}) {
           detail: { trustId: tenantTrustId, trustName: trustName || null, source: 'tenant-standalone-launch' }
         }));
 
-        // Installed PWA: stay on /<appSlug> and render Home in place.
+        // Installed PWA: stay on /app/<appSlug> and render Home in place.
         // Navigating to '/' here is what previously caused a refresh on
-        // /setu to fall through to the separate marketing site, since '/'
-        // is served by that site, not the member app, for this host.
+        // /app/setu to fall through to the separate marketing site, since
+        // '/' is served by that site, not the member app, for this host.
         setShowTenantHome(true);
         const cacheKey = getStandaloneVerificationKey(tenantTrustId);
         if (cacheKey) verifiedStandaloneEntries.add(cacheKey);
@@ -345,7 +346,7 @@ function TenantLanding({ onNavigate, onLogout, isMember } = {}) {
 
   // Standalone tenant session already validated membership (see
   // enterTenantTrust): render the existing Home UI in place, reused as-is,
-  // while the browser stays on /<appSlug> instead of navigating to '/'.
+  // while the browser stays on /app/<appSlug> instead of navigating to '/'.
   if (showTenantHome) {
     return <Home onNavigate={onNavigate} onLogout={onLogout} isMember={isMember} />;
   }

@@ -73,7 +73,7 @@ export const TenantProvider = ({ children }) => {
   // On app boot, if this device already has an installed tenant identity
   // (a slug resolved on a previous launch), re-resolve it so branding /
   // manifest / theme are available immediately without needing the user to
-  // revisit the /<slug> landing route again.
+  // revisit the /app/<slug> landing route again.
   useEffect(() => {
     if (rehydratedRef.current) return;
     rehydratedRef.current = true;

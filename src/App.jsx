@@ -308,7 +308,7 @@ const HospitalTrusteeApp = () => {
     return '';
   });
   const resolveDefaultThemeTrust = () => {
-    // Installed/tenant Trust identity (from a white-label /<slug> link) takes
+    // Installed/tenant Trust identity (from a white-label /app/<slug> link) takes
     // priority for the pre-login/auth theme so a customer-branded PWA shows
     // its own colors before the user ever logs in. This does not affect
     // `activeTrustId`/`selected_trust_id`, which still governs the app once
@@ -1598,7 +1598,7 @@ const HospitalTrusteeApp = () => {
           element={<PrivacyPolicy />}
         />
         <Route
-          path="/:appSlug"
+          path="/app/:appSlug"
           element={
             <TenantLanding
               onNavigate={handleNavigate}
