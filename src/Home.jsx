@@ -216,6 +216,21 @@ const buildCacheBustedIconUrl = (iconUrl, versionToken) => {
   return `${src}${separator}v=${encodeURIComponent(String(versionToken))}`;
 };
 
+// Resolves a possibly-local asset path against Vite's configured base
+// ('/' in dev, '/_setu-app/' in production) instead of the hardcoded site
+// root. Local icons (e.g. '/icons/quick-access/notices.svg') are only ever
+// deployed under that base, so a bare '/' path resolves against the wrong
+// host location — most visibly on white-label tenant hosts. Full remote
+// URLs (Supabase storage, CDNs, data URIs) are left untouched.
+const resolveAssetUrl = (path) => {
+  const value = String(path || '').trim();
+  if (!value) return '';
+  if (/^([a-z][a-z0-9+.-]*:)?\/\//i.test(value) || value.startsWith('data:')) return value;
+  if (!value.startsWith('/')) return value;
+  const base = String(import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+  return `${base}${value}`;
+};
+
 const resolveTrustIconToken = (trust, fallback = '1') =>
   String(
     trust?.version ||
@@ -280,6 +295,28 @@ const TrustChipIcon = memo(({ iconUrl, altText, versionToken, state }) => {
   && prevProps.versionToken === nextProps.versionToken
   && prevProps.state === nextProps.state
 ));
+
+// Quick-access tile icon: resolves local asset paths against the app's base
+// (see resolveAssetUrl) and falls back to a generic glyph if the URL is
+// missing or the image fails to load, instead of a broken-image placeholder.
+const QuickActionIcon = memo(({ src, alt }) => {
+  const [failedSrc, setFailedSrc] = useState('');
+  const resolvedSrc = resolveAssetUrl(src);
+  const hasValidIcon = Boolean(resolvedSrc) && failedSrc !== resolvedSrc;
+
+  if (!hasValidIcon) {
+    return <HelpCircle className="h-[18px] w-[18px]" style={{ color: 'var(--body-text-color)' }} />;
+  }
+
+  return (
+    <img
+      src={resolvedSrc}
+      alt={alt}
+      className="h-[18px] w-[18px] object-contain"
+      onError={() => setFailedSrc(resolvedSrc)}
+    />
+  );
+}, (prevProps, nextProps) => prevProps.src === nextProps.src && prevProps.alt === nextProps.alt);
 
 const normalizeMemberName = (value) => {
   const raw = String(value || '').trim();
@@ -3102,11 +3139,7 @@ const Home = ({ onNavigate, onLogout }) => {
                             border: `1px solid color-mix(in srgb, ${quickActionsText} 20%, transparent)`,
                           }}
                         >
-                          <img
-                            src={action.icon_url}
-                            alt={action.displayName}
-                            className="h-[18px] w-[18px] object-contain"
-                          />
+                          <QuickActionIcon src={action.icon_url} alt={action.displayName} />
                         </div>
                         <div className="flex items-start justify-between gap-1">
                           <div className="min-w-0 flex-1">

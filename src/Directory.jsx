@@ -7,6 +7,7 @@ import { getProfilePhotos } from './services/api';
 import { getNavbarThemeStyles } from './utils/themeUtils';
 import { applyOpacity } from './utils/colorUtils';
 import { MEMBER_PRIVACY_UPDATED_EVENT, matchesMemberIdentity } from './utils/memberIdentity';
+import { getAppHomePath } from './utils/tenantNavigation';
 import Sidebar from './features/sidebar/Sidebar';
 
 const MEMBERS_PER_PAGE = 20;
@@ -510,7 +511,7 @@ export const DirectoryContent = ({ onNavigate, variant = 'page' }) => {
               <h1 className="text-lg font-extrabold tracking-wide" style={{ color: navbarTextColor }}>Directory</h1>
               <button
                 type="button"
-                onClick={() => navigate('/')}
+                onClick={() => navigate(getAppHomePath())}
                 className="p-2 rounded-xl transition-colors"
                 style={{ color: navbarTextColor, background: 'transparent' }}
                 aria-label="Home"

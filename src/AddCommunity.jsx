@@ -5,6 +5,7 @@ import { useAppTheme } from './context/ThemeContext';
 import Sidebar from './features/sidebar/Sidebar';
 import { getNavbarThemeStyles, getThemeToken } from './utils/themeUtils';
 import { applyOpacity } from './utils/colorUtils';
+import { getAppHomePath } from './utils/tenantNavigation';
 
 const FieldLabel = ({ children, required = false }) => (
   <div className="mb-2">
@@ -57,7 +58,7 @@ const AddCommunity = ({ onNavigateBack }) => {
       onNavigateBack();
       return;
     }
-    navigate('/');
+    navigate(getAppHomePath());
   };
 
   const handleChange = (key) => (event) => {

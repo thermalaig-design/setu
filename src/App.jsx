@@ -62,6 +62,7 @@ import { logUserSessionEvent } from './services/sessionAuditService';
 import { applyThemeCssVariables, scopeCustomCss } from './utils/themeUtils';
 import { clearLoginTermsPromptPending } from './utils/legalContent';
 import { colorToHex } from './utils/colorUtils';
+import { getAppHomePath } from './utils/tenantNavigation';
 import {
   THEME_REFRESH_EVENT
 } from './utils/themeEvents';
@@ -1003,7 +1004,7 @@ const HospitalTrusteeApp = () => {
       navigate('/committee-members');
     } else {
       const routeMap = {
-        'home': '/',
+        'home': getAppHomePath(),
         'login': '/login',
         'vip-login': '/vip-login',
         'profile': '/profile',
@@ -1139,7 +1140,7 @@ const HospitalTrusteeApp = () => {
               <FeatureGuard featureKey="feature_profile">
                 <Profile
                   onNavigate={handleNavigate}
-                  onNavigateBack={() => navigate('/')}
+                  onNavigateBack={() => navigate(getAppHomePath())}
                   onProfileUpdate={() => { }}
                 />
               </FeatureGuard>
@@ -1153,7 +1154,7 @@ const HospitalTrusteeApp = () => {
               <FeatureGuard featureKey="feature_directory">
                 <Directory
                   onNavigate={handleNavigate}
-                  onNavigateBack={() => navigate('/')}
+                  onNavigateBack={() => navigate(getAppHomePath())}
                   onLogout={clearAuthAndRedirectToLogin}
                 />
               </FeatureGuard>
@@ -1167,7 +1168,7 @@ const HospitalTrusteeApp = () => {
               <FeatureGuard featureKey="feature_directory">
                 <HealthcareTrusteeDirectory
                   onNavigate={handleNavigate}
-                  onNavigateBack={() => navigate('/')}
+                  onNavigateBack={() => navigate(getAppHomePath())}
                   onLogout={clearAuthAndRedirectToLogin}
                 />
               </FeatureGuard>
@@ -1183,7 +1184,7 @@ const HospitalTrusteeApp = () => {
                   onNavigate={handleNavigate}
                   appointmentForm={appointmentForm}
                   setAppointmentForm={setAppointmentForm}
-                  onNavigateBack={() => navigate('/')}
+                  onNavigateBack={() => navigate(getAppHomePath())}
                 />
               </FeatureGuard>
             </ProtectedRoute>
@@ -1505,7 +1506,7 @@ const HospitalTrusteeApp = () => {
               <FeatureGuard featureKey="feature_gallery">
                 <Gallery
                   onNavigate={handleNavigate}
-                  onNavigateBack={() => navigate('/')}
+                  onNavigateBack={() => navigate(getAppHomePath())}
                 />
               </FeatureGuard>
             </ProtectedRoute>
@@ -1517,7 +1518,7 @@ const HospitalTrusteeApp = () => {
             <ProtectedRoute>
               <FeatureGuard featureKey="ContactUs">
                 <ContactUs
-                  onNavigateBack={() => navigate('/')}
+                  onNavigateBack={() => navigate(getAppHomePath())}
                 />
               </FeatureGuard>
             </ProtectedRoute>
@@ -1550,7 +1551,7 @@ const HospitalTrusteeApp = () => {
           element={
             <ProtectedRoute>
               <FeatureGuard featureKey="feature_add_community">
-                <AddCommunity onNavigateBack={() => navigate('/')} />
+                <AddCommunity onNavigateBack={() => navigate(getAppHomePath())} />
               </FeatureGuard>
             </ProtectedRoute>
           }
@@ -1598,9 +1599,15 @@ const HospitalTrusteeApp = () => {
         />
         <Route
           path="/:appSlug"
-          element={<TenantLanding />}
+          element={
+            <TenantLanding
+              onNavigate={handleNavigate}
+              onLogout={clearAuthAndRedirectToLogin}
+              isMember={isMember}
+            />
+          }
         />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to={getAppHomePath()} replace />} />
       </Routes>
     </div>
   );

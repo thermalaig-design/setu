@@ -6,6 +6,7 @@ import {
   Menu, Home as HomeIcon, FolderOpen, Play, Pause, ArrowLeft
 } from 'lucide-react';
 import Sidebar from './features/sidebar/Sidebar';
+import { getAppHomePath } from './utils/tenantNavigation';
 
 function FolderCover({ photos, folderName }) {
   const [p1Err, setP1Err] = useState(false);
@@ -430,7 +431,7 @@ export function GalleryContent({ onNavigate, variant = 'page' }) {
             </span>
           </div>
 
-          <button onClick={() => navigate('/')} style={nb.iconBtn}>
+          <button onClick={() => navigate(getAppHomePath())} style={nb.iconBtn}>
             <HomeIcon style={{ width: 22, height: 22, color: 'var(--app-button-text, var(--surface-color))' }} />
           </button>
         </div>

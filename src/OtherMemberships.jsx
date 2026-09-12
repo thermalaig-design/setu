@@ -10,6 +10,7 @@ import { useAppTheme } from './context/ThemeContext';
 import { applyOpacity } from './utils/colorUtils';
 import { getNavbarThemeStyles, getThemeToken } from './utils/themeUtils';
 import { fetchActiveTrustsByMobile } from './services/trustService';
+import { getAppHomePath } from './utils/tenantNavigation';
 
 // ─── Supabase helpers ──────────────────────────────────────────────────────
 
@@ -830,7 +831,7 @@ const OtherMemberships = ({ onNavigate }) => {
           Other Memberships
         </h1>
         <button
-          onClick={() => (onNavigate ? onNavigate('home') : navigate('/'))}
+          onClick={() => (onNavigate ? onNavigate('home') : navigate(getAppHomePath()))}
           className="p-2 rounded-xl transition-colors"
           style={{ color: navbarTheme?.textColor || 'var(--navbar-text)', background: 'transparent' }}
         >

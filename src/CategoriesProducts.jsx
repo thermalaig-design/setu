@@ -22,6 +22,7 @@ import { buildCategoryView, getCardRowPattern, splitIntoRows } from './utils/cat
 import { getNavbarThemeStyles } from './utils/themeUtils';
 import { readWishlistItems, subscribeWishlist } from './utils/productWishlist';
 import { readCartItems, subscribeCart } from './utils/productCart';
+import { getAppHomePath } from './utils/tenantNavigation';
 import {
   enrichPayloadWithPrices,
   fetchProductCategoryTree,
@@ -542,7 +543,7 @@ export function CategoriesProductsContent({
               <div className="flex items-center justify-between gap-3">
                 <button
                   type="button"
-                  onClick={() => navigate('/')}
+                  onClick={() => navigate(getAppHomePath())}
                   className="rounded-xl p-2 transition-colors"
                   style={{
                     color: navbarTextColor,

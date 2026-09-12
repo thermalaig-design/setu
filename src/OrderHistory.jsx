@@ -23,6 +23,7 @@ import {
 } from './utils/orderHistoryDisplay';
 import { useAppTheme } from './context/ThemeContext';
 import { getNavbarThemeStyles } from './utils/themeUtils';
+import { getAppHomePath } from './utils/tenantNavigation';
 
 const T = {
   page: 'var(--page-bg, var(--app-page-bg))',
@@ -372,7 +373,7 @@ export function OrderHistoryContent({ variant = 'page' } = {}) {
             <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={() => navigate('/')}
+                onClick={() => navigate(getAppHomePath())}
                 className="p-2 rounded-xl transition-colors"
                 style={{
                   color: navbarTextColor,
@@ -522,7 +523,7 @@ export function OrderHistoryContent({ variant = 'page' } = {}) {
                 <button
                   type="button"
                   className="order-history-secondary-btn"
-                  onClick={() => navigate('/')}
+                  onClick={() => navigate(getAppHomePath())}
                 >
                   Go home
                 </button>

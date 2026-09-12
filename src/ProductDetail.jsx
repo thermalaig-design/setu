@@ -12,6 +12,7 @@ import {
   toggleWishlistProductAsync,
 } from './utils/productWishlist';
 import { getCartKey, readCartItems, setCartProductQuantity, subscribeCart } from './utils/productCart';
+import { getAppHomePath } from './utils/tenantNavigation';
 import {
   isTrustCatalogCacheFresh,
   readTrustCatalogCacheForCandidates,
@@ -1921,7 +1922,7 @@ const ProductDetail = ({ categoryId, productId, onBack }) => {
       onBack();
       return;
     }
-    navigate('/');
+    navigate(getAppHomePath());
   };
 
   return (

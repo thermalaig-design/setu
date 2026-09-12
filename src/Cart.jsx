@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Check, ChevronDown, ChevronLeft, Heart, Home as HomeIcon, ShoppingCart, Trash2, X } from 'lucide-react';
 import { useAppTheme } from './context/ThemeContext';
 import { getNavbarThemeStyles } from './utils/themeUtils';
+import { getAppHomePath } from './utils/tenantNavigation';
 import {
   clearCartItems,
   fetchTrustProductsCategories,
@@ -1028,7 +1029,7 @@ function Cart() {
               <button
                 type="button"
                 className="ws-header-icon-btn"
-                onClick={() => navigate('/')}
+                onClick={() => navigate(getAppHomePath())}
                 aria-label="Go home"
               >
                 <HomeIcon size={20} strokeWidth={1.8} />
