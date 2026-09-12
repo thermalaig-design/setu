@@ -29,7 +29,16 @@ export default defineConfig(({ command }) => ({
       workbox: {
         // The app's main bundle exceeds workbox's default 2 MiB precache
         // limit; raise it so the build doesn't fail precaching that asset.
-        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        // Disable Workbox's navigation fallback. With scope '/', generateSW
+        // otherwise auto-registers a NavigationRoute that serves the cached
+        // index.html for every navigation under that scope — including
+        // /<slug> routes like /setu, which Nginx already resolves correctly
+        // to the member-app index.html. Without this, the service worker
+        // hijacks those document navigations and replaces them with the
+        // root site's (404) index.html instead of letting them hit the
+        // network/Nginx normally.
+        navigateFallback: null
       }
     })
   ],
