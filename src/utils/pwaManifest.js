@@ -1,5 +1,3 @@
-const MANIFEST_ENDPOINT = 'https://lqdmefugrhluzlfabmuy.supabase.co/functions/v1/generate-webApp-link';
-
 // Dynamically points <link rel="manifest"> at the tenant-specific manifest
 // endpoint, and updates document title / theme-color for the resolved Trust.
 // Never hardcode a slug here — it always comes from the resolved tenant.
@@ -14,7 +12,7 @@ export const applyTenantManifest = ({ slug, trust } = {}) => {
     manifestLink.rel = 'manifest';
     document.head.appendChild(manifestLink);
   }
-  manifestLink.setAttribute('href', `${MANIFEST_ENDPOINT}?slug=${encodeURIComponent(normalizedSlug)}`);
+  manifestLink.setAttribute('href', `/pwa-manifest/${encodeURIComponent(normalizedSlug)}.webmanifest`);
 
   if (trust?.name) {
     document.title = trust.name;

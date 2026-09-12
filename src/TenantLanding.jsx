@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { useTenant } from './context/TenantContext';
 import { isReservedSlug } from './constants/reservedRoutes';
@@ -53,15 +53,80 @@ function TenantLanding() {
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
+  // Shared by "Continue in Browser" and the standalone (installed PWA) auto
+  // entry below: resolves the same Trust identity through both paths so the
+  // Trust opened from /<slug> is always the Trust the user lands in after
+  // login, never whatever Trust was last selected on another app.
+  const enterTenantTrust = useCallback(async ({ source } = {}) => {
+    setMembershipMessage('');
+
+    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    const rawUser = isLoggedIn ? localStorage.getItem('user') : null;
+    let user = null;
+    try {
+      user = rawUser ? JSON.parse(rawUser) : null;
+    } catch {
+      user = null;
+    }
+
+    if (!isLoggedIn || !user) {
+      navigate('/login', { replace: true });
+      return false;
+    }
+
+    const tenantTrustId = normalizeText(tenantTrust?.id);
+    const membersId = user.members_id || user.member_id || user.id || null;
+    const membershipNumber = user.membership_number || user['Membership number'] || '';
+
+    setCheckingMembership(true);
+    try {
+      // Reuse the same membership-lookup service OTPVerification.jsx uses to
+      // verify Trust membership, instead of introducing a second model.
+      let memberships = [];
+      try {
+        memberships = await fetchMemberTrustMemberships({ membersId, membershipNumber });
+      } catch (fetchErr) {
+        console.warn('[TenantLanding] Live membership check failed, using cached memberships:', fetchErr?.message || fetchErr);
+        memberships = getUserHospitalMemberships(user);
+      }
+
+      const tenantMembership = (Array.isArray(memberships) ? memberships : [])
+        .find((membership) => normalizeText(membership?.trust_id) === tenantTrustId);
+
+      if (tenantMembership) {
+        const trustName = normalizeText(tenantMembership.trust_name || tenantTrust?.name);
+        localStorage.setItem('selected_trust_id', tenantTrustId);
+        localStorage.setItem(LAST_SELECTED_TRUST_ID_KEY, tenantTrustId);
+        if (trustName) localStorage.setItem('selected_trust_name', trustName);
+        window.dispatchEvent(new CustomEvent('trust-changed', {
+          detail: { trustId: tenantTrustId, trustName: trustName || null, source: source || 'tenant-continue-in-browser' }
+        }));
+        navigate('/', { replace: true });
+        return true;
+      }
+
+      setMembershipMessage(`Your account is not a member of ${tenantTrust?.name || 'this'}. Please log in with the mobile number registered for this Trust.`);
+      return false;
+    } catch (err) {
+      console.warn('[TenantLanding] Membership verification failed:', err?.message || err);
+      setMembershipMessage('Unable to verify your membership right now. Please try again.');
+      return false;
+    } finally {
+      setCheckingMembership(false);
+    }
+  }, [navigate, tenantTrust]);
+
   // If the app is already installed (running standalone) and the tenant
   // resolved successfully, skip the marketing landing and go straight to
-  // the normal auth flow for this Trust identity.
+  // the normal auth flow for this Trust identity — verifying membership and
+  // switching selected_trust_id the same way "Continue in Browser" does, so
+  // opening the installed Setu app never lands you inside another Trust.
   useEffect(() => {
     if (!resolvedOnce || !tenantTrust) return;
     if (!isStandaloneDisplay()) return;
-    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    navigate(isLoggedIn ? '/' : '/login', { replace: true });
-  }, [resolvedOnce, tenantTrust, navigate]);
+    enterTenantTrust({ source: 'tenant-standalone-launch' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedOnce, tenantTrust]);
 
   if (reserved) {
     return <Navigate to="/" replace />;
@@ -94,6 +159,19 @@ function TenantLanding() {
   const backgroundColor = tenantTrust.pwa_background_color || '#1a1a1a';
   const logoUrl = tenantTrust.pwa_icon_192_url || tenantTrust.icon_url || '';
 
+  // Standalone (installed PWA) launches auto-enter via enterTenantTrust above;
+  // show a branded spinner instead of flashing the Install/Continue card
+  // while that redirect/membership check is in flight.
+  if (isStandaloneDisplay() && !membershipMessage) {
+    return (
+      <div style={{ ...styles.page, background: backgroundColor }}>
+        <div style={{ ...styles.spinner, borderTopColor: themeColor }} />
+        <p style={styles.loadingText}>Opening {tenantTrust.name}…</p>
+        <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
+      </div>
+    );
+  }
+
   const handleInstallClick = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -105,66 +183,11 @@ function TenantLanding() {
     setInstallOutcome(isIosSafari() ? 'ios-instructions' : 'unsupported');
   };
 
-  const handleContinueInBrowser = async () => {
-    setMembershipMessage('');
-
-    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    const rawUser = isLoggedIn ? localStorage.getItem('user') : null;
-    let user = null;
-    try {
-      user = rawUser ? JSON.parse(rawUser) : null;
-    } catch {
-      user = null;
-    }
-
-    if (!isLoggedIn || !user) {
-      navigate('/login');
-      return;
-    }
-
-    const tenantTrustId = normalizeText(tenantTrust?.id);
-    const membersId = user.members_id || user.member_id || user.id || null;
-    const membershipNumber = user.membership_number || user['Membership number'] || '';
-
-    setCheckingMembership(true);
-    try {
-      // Reuse the same membership-lookup service OTPVerification.jsx uses to
-      // verify Trust membership, instead of introducing a second model.
-      let memberships = [];
-      try {
-        memberships = await fetchMemberTrustMemberships({ membersId, membershipNumber });
-      } catch (fetchErr) {
-        console.warn('[TenantLanding] Live membership check failed, using cached memberships:', fetchErr?.message || fetchErr);
-        memberships = getUserHospitalMemberships(user);
-      }
-
-      const tenantMembership = (Array.isArray(memberships) ? memberships : [])
-        .find((membership) => normalizeText(membership?.trust_id) === tenantTrustId);
-
-      if (tenantMembership) {
-        const trustName = normalizeText(tenantMembership.trust_name || tenantTrust?.name);
-        localStorage.setItem('selected_trust_id', tenantTrustId);
-        localStorage.setItem(LAST_SELECTED_TRUST_ID_KEY, tenantTrustId);
-        if (trustName) localStorage.setItem('selected_trust_name', trustName);
-        window.dispatchEvent(new CustomEvent('trust-changed', {
-          detail: { trustId: tenantTrustId, trustName: trustName || null, source: 'tenant-continue-in-browser' }
-        }));
-        navigate('/', { replace: true });
-        return;
-      }
-
-      setMembershipMessage(`Your account is not a member of ${tenantTrust?.name || 'this'}. Please log in with the mobile number registered for this Trust.`);
-    } catch (err) {
-      console.warn('[TenantLanding] Membership verification failed:', err?.message || err);
-      setMembershipMessage('Unable to verify your membership right now. Please try again.');
-    } finally {
-      setCheckingMembership(false);
-    }
-  };
+  const handleContinueInBrowser = () => enterTenantTrust({ source: 'tenant-continue-in-browser' });
 
   return (
     <div style={{ ...styles.page, background: backgroundColor }}>
-      <div style={styles.card}>
+      <div className="tenant-card" style={styles.card}>
         {logoUrl && (
           <img
             src={logoUrl}
@@ -178,6 +201,7 @@ function TenantLanding() {
 
         <button
           type="button"
+          className="tenant-install-btn"
           onClick={handleInstallClick}
           style={{ ...styles.installBtn, background: themeColor }}
         >
@@ -186,11 +210,17 @@ function TenantLanding() {
 
         <button
           type="button"
+          className="tenant-continue-btn"
           onClick={handleContinueInBrowser}
           disabled={checkingMembership}
           style={{ ...styles.continueBtn, ...(checkingMembership ? styles.continueBtnDisabled : {}) }}
         >
-          {checkingMembership ? 'Checking…' : 'Continue in Browser'}
+          {checkingMembership ? (
+            <span style={styles.btnLoading}>
+              <span style={styles.btnSpinner} />
+              Checking…
+            </span>
+          ) : 'Continue in Browser'}
         </button>
 
         {membershipMessage && (
@@ -213,6 +243,16 @@ function TenantLanding() {
           <p style={styles.instructions}>You can install the app anytime from your browser menu.</p>
         )}
       </div>
+      <style>{`
+        @keyframes tenantCardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .tenant-card { animation: tenantCardIn 0.35s ease-out; }
+        .tenant-install-btn { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+        .tenant-install-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
+        .tenant-install-btn:active { transform: translateY(0); }
+        .tenant-continue-btn { transition: border-color 0.15s ease, background 0.15s ease; }
+        .tenant-continue-btn:hover:not(:disabled) { border-color: #7a7a7a; background: rgba(255,255,255,0.04); }
+      `}</style>
     </div>
   );
 }
@@ -263,6 +303,7 @@ const styles = {
     width: '100%',
     maxWidth: '380px',
     background: 'rgba(0,0,0,0.25)',
+    border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: '18px',
     padding: '36px 24px',
     display: 'flex',
@@ -270,6 +311,8 @@ const styles = {
     alignItems: 'center',
     textAlign: 'center',
     gap: '12px',
+    boxShadow: '0 20px 44px rgba(0,0,0,0.35)',
+    backdropFilter: 'blur(6px)',
   },
   logo: {
     width: '88px',
@@ -312,6 +355,20 @@ const styles = {
   continueBtnDisabled: {
     opacity: 0.6,
     cursor: 'not-allowed',
+  },
+  btnLoading: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+  },
+  btnSpinner: {
+    width: '13px',
+    height: '13px',
+    border: '2px solid rgba(255,255,255,0.25)',
+    borderTopColor: '#d8d8d8',
+    borderRadius: '50%',
+    animation: 'spin 0.7s linear infinite',
   },
   membershipMessage: {
     color: '#f5c842',
