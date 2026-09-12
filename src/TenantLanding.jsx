@@ -22,6 +22,65 @@ const isStandaloneDisplay = () => {
   return Boolean(mql?.matches) || window.navigator?.standalone === true;
 };
 
+// --- Contrast-safe tenant theming -----------------------------------------
+// Trusts can set arbitrary pwa_theme_color / pwa_background_color values
+// (including #ffffff). These helpers make sure body/heading text always
+// stays readable instead of trusting the tenant color directly for text.
+const hexToRgb = (hex) => {
+  const raw = String(hex || '').trim().replace('#', '');
+  const full = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw;
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) return null;
+  const num = parseInt(full, 16);
+  return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+};
+
+const relativeLuminance = ({ r, g, b }) => {
+  const channel = (c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+};
+
+const contrastRatio = (hexA, hexB) => {
+  const lumA = relativeLuminance(hexToRgb(hexA) || { r: 0, g: 0, b: 0 });
+  const lumB = relativeLuminance(hexToRgb(hexB) || { r: 255, g: 255, b: 255 });
+  const lighter = Math.max(lumA, lumB);
+  const darker = Math.min(lumA, lumB);
+  return (lighter + 0.05) / (darker + 0.05);
+};
+
+const isLightColor = (hex) => {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return false;
+  return relativeLuminance(rgb) > 0.5;
+};
+
+// Derives a safe, readable palette for the card from the tenant's theme /
+// background colors. The theme color is used for accents (buttons, borders)
+// and only used as text color when it is actually legible; otherwise text
+// falls back to a neutral color chosen from the page background's lightness.
+const getTenantPalette = (themeColor, backgroundColor) => {
+  const lightBg = isLightColor(backgroundColor);
+
+  const textPrimary = lightBg ? '#181510' : '#f5f0e0';
+  const textSecondary = lightBg ? '#4a4438' : '#c8c2b0';
+  const textMuted = lightBg ? '#6b6558' : '#a8a190';
+
+  const cardBackground = lightBg ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.28)';
+  const cardBorder = lightBg ? 'rgba(20,16,8,0.10)' : 'rgba(255,255,255,0.08)';
+  const cardHoverTint = lightBg ? 'rgba(20,16,8,0.06)' : 'rgba(255,255,255,0.08)';
+
+  // Effective card surface color, used only to test whether the theme color
+  // reads well as text on top of it (not as the actual rendered background).
+  const cardEffectiveBg = lightBg ? '#f2efe8' : '#141210';
+  const accentText = contrastRatio(themeColor, cardEffectiveBg) >= 3 ? themeColor : textPrimary;
+  const installBtnText = isLightColor(themeColor) ? '#181510' : '#fff8ec';
+  const warningText = lightBg ? '#8a5a00' : '#f5c842';
+
+  return { lightBg, textPrimary, textSecondary, textMuted, cardBackground, cardBorder, cardHoverTint, accentText, installBtnText, warningText };
+};
+
 function TenantLanding() {
   const { appSlug } = useParams();
   const navigate = useNavigate();
@@ -158,6 +217,7 @@ function TenantLanding() {
   const themeColor = tenantTrust.pwa_theme_color || '#d4af37';
   const backgroundColor = tenantTrust.pwa_background_color || '#1a1a1a';
   const logoUrl = tenantTrust.pwa_icon_192_url || tenantTrust.icon_url || '';
+  const palette = getTenantPalette(themeColor, backgroundColor);
 
   // Standalone (installed PWA) launches auto-enter via enterTenantTrust above;
   // show a branded spinner instead of flashing the Install/Continue card
@@ -166,7 +226,7 @@ function TenantLanding() {
     return (
       <div style={{ ...styles.page, background: backgroundColor }}>
         <div style={{ ...styles.spinner, borderTopColor: themeColor }} />
-        <p style={styles.loadingText}>Opening {tenantTrust.name}…</p>
+        <p style={{ ...styles.loadingText, color: palette.textSecondary }}>Opening {tenantTrust.name}…</p>
         <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
       </div>
     );
@@ -187,7 +247,10 @@ function TenantLanding() {
 
   return (
     <div style={{ ...styles.page, background: backgroundColor }}>
-      <div className="tenant-card" style={styles.card}>
+      <div
+        className="tenant-card"
+        style={{ ...styles.card, background: palette.cardBackground, borderColor: palette.cardBorder }}
+      >
         {logoUrl && (
           <img
             src={logoUrl}
@@ -196,14 +259,19 @@ function TenantLanding() {
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />
         )}
-        <h1 style={{ ...styles.heading, color: themeColor }}>{tenantTrust.name}</h1>
-        <p style={styles.subheading}>Install the app for the best experience</p>
+        <p style={{ ...styles.trustName, color: palette.accentText }}>{tenantTrust.name}</p>
+        <h1 style={{ ...styles.heading, color: palette.textPrimary }}>
+          Install {tenantTrust.name} on your device
+        </h1>
+        <p style={{ ...styles.subheading, color: palette.textSecondary }}>
+          Get faster access and open this Trust directly from your home screen.
+        </p>
 
         <button
           type="button"
           className="tenant-install-btn"
           onClick={handleInstallClick}
-          style={{ ...styles.installBtn, background: themeColor }}
+          style={{ ...styles.installBtn, background: themeColor, color: palette.installBtnText }}
         >
           Install App
         </button>
@@ -213,34 +281,31 @@ function TenantLanding() {
           className="tenant-continue-btn"
           onClick={handleContinueInBrowser}
           disabled={checkingMembership}
-          style={{ ...styles.continueBtn, ...(checkingMembership ? styles.continueBtnDisabled : {}) }}
+          style={{
+            ...styles.continueBtn,
+            borderColor: themeColor,
+            color: palette.textPrimary,
+            ...(checkingMembership ? styles.continueBtnDisabled : {}),
+          }}
         >
           {checkingMembership ? (
             <span style={styles.btnLoading}>
-              <span style={styles.btnSpinner} />
+              <span style={{ ...styles.btnSpinner, borderTopColor: palette.textPrimary }} />
               Checking…
             </span>
           ) : 'Continue in Browser'}
         </button>
 
         {membershipMessage && (
-          <p style={styles.membershipMessage}>{membershipMessage}</p>
+          <p style={{ ...styles.membershipMessage, color: palette.warningText }}>{membershipMessage}</p>
         )}
 
-        {installOutcome === 'ios-instructions' && (
-          <p style={styles.instructions}>
-            To install: tap the <strong>Share</strong> icon in Safari, then choose{' '}
-            <strong>Add to Home Screen</strong>.
+        {installOutcome && (
+          <p style={{ ...styles.instructions, color: palette.textMuted }}>
+            {installOutcome === 'ios-instructions' && 'Tap Share → Add to Home Screen'}
+            {installOutcome === 'unsupported' && 'Use your browser menu and choose Install App / Add to Home Screen.'}
+            {installOutcome === 'dismissed' && 'You can install the app anytime from your browser menu.'}
           </p>
-        )}
-        {installOutcome === 'unsupported' && (
-          <p style={styles.instructions}>
-            Your browser does not support one-tap install. Use your browser menu and choose{' '}
-            <strong>Add to Home Screen</strong> / <strong>Install App</strong>.
-          </p>
-        )}
-        {installOutcome === 'dismissed' && (
-          <p style={styles.instructions}>You can install the app anytime from your browser menu.</p>
         )}
       </div>
       <style>{`
@@ -250,8 +315,10 @@ function TenantLanding() {
         .tenant-install-btn { transition: transform 0.15s ease, box-shadow 0.15s ease; }
         .tenant-install-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
         .tenant-install-btn:active { transform: translateY(0); }
-        .tenant-continue-btn { transition: border-color 0.15s ease, background 0.15s ease; }
-        .tenant-continue-btn:hover:not(:disabled) { border-color: #7a7a7a; background: rgba(255,255,255,0.04); }
+        .tenant-continue-btn { transition: background 0.15s ease, transform 0.15s ease, opacity 0.15s ease; }
+        .tenant-continue-btn:hover:not(:disabled) { background: ${palette.cardHoverTint}; transform: translateY(-1px); }
+        .tenant-continue-btn:active:not(:disabled) { transform: translateY(0); }
+        .tenant-continue-btn:disabled { cursor: not-allowed; }
       `}</style>
     </div>
   );
@@ -264,7 +331,7 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '16px',
+    padding: '20px 16px',
     fontFamily: "'Inter', 'Helvetica Neue', sans-serif",
     background: '#1a1a1a',
   },
@@ -301,59 +368,64 @@ const styles = {
   },
   card: {
     width: '100%',
-    maxWidth: '380px',
+    maxWidth: '460px',
     background: 'rgba(0,0,0,0.25)',
     border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: '18px',
-    padding: '36px 24px',
+    padding: '36px 28px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     textAlign: 'center',
-    gap: '12px',
+    gap: '10px',
     boxShadow: '0 20px 44px rgba(0,0,0,0.35)',
     backdropFilter: 'blur(6px)',
+    margin: '0 auto',
   },
   logo: {
-    width: '88px',
-    height: '88px',
+    width: '84px',
+    height: '84px',
     borderRadius: '20px',
     objectFit: 'cover',
-    marginBottom: '8px',
+    marginBottom: '4px',
+  },
+  trustName: {
+    margin: 0,
+    fontSize: '22px',
+    fontWeight: 800,
+    letterSpacing: '-0.2px',
   },
   heading: {
     margin: 0,
-    fontSize: '24px',
-    fontWeight: 700,
+    fontSize: '15px',
+    fontWeight: 600,
   },
   subheading: {
-    margin: '0 0 12px',
-    color: '#c8c8c8',
+    margin: '0 0 14px',
     fontSize: '13px',
+    lineHeight: 1.5,
   },
   installBtn: {
     width: '100%',
     border: 'none',
     borderRadius: '10px',
     padding: '15px',
-    color: '#080808',
     fontWeight: 700,
     fontSize: '15px',
     cursor: 'pointer',
   },
   continueBtn: {
     width: '100%',
-    border: '1px solid #4a4a4a',
+    border: '1.5px solid transparent',
     borderRadius: '10px',
     padding: '13px',
     background: 'transparent',
-    color: '#d8d8d8',
-    fontWeight: 600,
+    fontWeight: 700,
     fontSize: '14px',
     cursor: 'pointer',
   },
   continueBtnDisabled: {
-    opacity: 0.6,
+    opacity: 0.55,
     cursor: 'not-allowed',
   },
   btnLoading: {
@@ -365,7 +437,7 @@ const styles = {
   btnSpinner: {
     width: '13px',
     height: '13px',
-    border: '2px solid rgba(255,255,255,0.25)',
+    border: '2px solid rgba(128,128,128,0.3)',
     borderTopColor: '#d8d8d8',
     borderRadius: '50%',
     animation: 'spin 0.7s linear infinite',
@@ -377,7 +449,6 @@ const styles = {
     lineHeight: 1.4,
   },
   instructions: {
-    color: '#a8a8a8',
     fontSize: '12px',
     marginTop: '4px',
   },
